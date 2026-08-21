@@ -1,27 +1,31 @@
 import 'package:flutter/material.dart';
 
-import '../../../theme/app_colors.dart';
+import '../../../theme/power_atmosphere.dart';
 
 class MetricTile extends StatelessWidget {
   const MetricTile({
     super.key,
+    required this.atmosphere,
     required this.label,
     required this.value,
     this.icon,
   });
 
+  final PowerAtmosphere atmosphere;
   final String label;
   final String value;
   final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final accent = atmosphere.accent;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 450),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
-        color: AppColors.muted.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.panel.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,14 +33,14 @@ class MetricTile extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 15, color: AppColors.mutedForeground),
+                Icon(icon, size: 15, color: accent.withValues(alpha: 0.85)),
                 const SizedBox(width: 6),
               ],
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    color: AppColors.mutedForeground,
+                  style: TextStyle(
+                    color: AppColors.textDim,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -47,10 +51,11 @@ class MetricTile extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 16,
               letterSpacing: -0.2,
+              color: AppColors.text,
             ),
           ),
         ],

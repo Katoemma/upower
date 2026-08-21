@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
-import '../../../theme/app_colors.dart';
+import '../../../theme/power_atmosphere.dart';
 import '../auth/auth_controller.dart';
 import 'widgets/live_pill.dart';
 import 'widgets/metric_tile.dart';
@@ -39,6 +40,11 @@ class PowerUiState {
   final String? lastEvent;
   final String? error;
   final bool loading;
+
+  PowerAtmosphere get atmosphere => PowerAtmosphere.fromPower(
+        acConnected: acConnected,
+        percentage: percentage,
+      );
 
   PowerUiState copyWith({
     bool? acConnected,
@@ -160,138 +166,146 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final power = ref.watch(powerSnapshotProvider);
     final auth = ref.watch(authControllerProvider);
+    final atmo = power.atmosphere;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: false,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Power Monitor',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                  ),
-            ),
-            Text(
-              auth.email ?? 'Company home server',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.mutedForeground,
-                  ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Events',
-            onPressed: () => context.push('/events'),
-            icon: const Icon(Icons.history_rounded),
-          ),
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
-            icon: const Icon(Icons.settings_outlined),
-          ),
-        ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: AppColors.voidBlack,
       ),
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFF8F3),
-              AppColors.background,
-              Color(0xFFF7F7F7),
-            ],
-            stops: [0, 0.35, 1],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: atmo.gradient,
           ),
         ),
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(powerSnapshotProvider.notifier).refresh(),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 36),
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: LivePill(connected: power.live),
-              ),
-              const SizedBox(height: 8),
-              if (power.loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 80),
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                )
-              else ...[
-                StatusHero(
-                  acConnected: power.acConnected,
-                  percentage: power.percentage,
-                  stateLabel: _prettyState(power.state),
-                  subtitle: _subtitle(power),
-                ),
-                if (power.error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    power.error!,
-                    style: const TextStyle(color: AppColors.destructive),
-                  ),
-                ],
-                const SizedBox(height: 22),
-                const ServerIdentity(),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: MetricTile(
-                        icon: Icons.favorite_outline_rounded,
-                        label: 'Battery health',
-                        value: power.health == null
-                            ? '—'
-                            : '${power.health!.round()}%',
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Power Monitor',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: AppColors.text,
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: MetricTile(
-                        icon: Icons.schedule_rounded,
-                        label: power.acConnected ? 'Time to full' : 'Runtime',
-                        value: _etaLabel(power),
-                      ),
-                    ),
-                  ],
                 ),
-                if (power.lastEvent != null) ...[
-                  const SizedBox(height: 10),
-                  MetricTile(
-                    icon: Icons.bolt_outlined,
-                    label: 'Last event',
-                    value: _prettyState(power.lastEvent!),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                FilledButton.tonal(
-                  onPressed: () => context.push('/events'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.foreground,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Event history'),
+                Text(
+                  auth.email ?? 'home-server',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textDim,
+                      ),
                 ),
               ],
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Events',
+                onPressed: () => context.push('/events'),
+                icon: Icon(Icons.history_rounded, color: atmo.accentSoft),
+              ),
+              IconButton(
+                tooltip: 'Settings',
+                onPressed: () => context.push('/settings'),
+                icon: Icon(Icons.tune_rounded, color: atmo.accentSoft),
+              ),
             ],
+          ),
+          body: RefreshIndicator(
+            color: atmo.accent,
+            backgroundColor: AppColors.panel,
+            onRefresh: () => ref.read(powerSnapshotProvider.notifier).refresh(),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 36),
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: LivePill(connected: power.live, atmosphere: atmo),
+                ),
+                const SizedBox(height: 4),
+                if (power.loading)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 80),
+                    child: Center(
+                      child: CircularProgressIndicator(color: atmo.accent),
+                    ),
+                  )
+                else ...[
+                  StatusHero(
+                    atmosphere: atmo,
+                    acConnected: power.acConnected,
+                    percentage: power.percentage,
+                    stateLabel: _prettyState(power.state),
+                    subtitle: _subtitle(power),
+                  ),
+                  if (power.error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      power.error!,
+                      style: const TextStyle(color: AppColors.destructive),
+                    ),
+                  ],
+                  const SizedBox(height: 22),
+                  ServerIdentity(atmosphere: atmo),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: MetricTile(
+                          atmosphere: atmo,
+                          icon: Icons.favorite_outline_rounded,
+                          label: 'Cell health',
+                          value: power.health == null
+                              ? '—'
+                              : '${power.health!.round()}%',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: MetricTile(
+                          atmosphere: atmo,
+                          icon: Icons.schedule_rounded,
+                          label: power.acConnected ? 'To full' : 'Runtime',
+                          value: _etaLabel(power),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (power.lastEvent != null) ...[
+                    const SizedBox(height: 10),
+                    MetricTile(
+                      atmosphere: atmo,
+                      icon: Icons.bolt_outlined,
+                      label: 'Last signal',
+                      value: _prettyState(power.lastEvent!),
+                    ),
+                  ],
+                  const SizedBox(height: 22),
+                  FilledButton(
+                    onPressed: () => context.push('/events'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: atmo.accent,
+                      foregroundColor: AppColors.voidBlack,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Open event timeline'),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

@@ -13,7 +13,7 @@ class PowerMonitorApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Power Monitor',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
+      theme: AppTheme.futuristic(),
       routerConfig: router,
     );
   }

@@ -48,7 +48,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final auth = ref.watch(authControllerProvider);
 
     return Scaffold(
-      body: SafeArea(
+      backgroundColor: AppColors.voidBlack,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0A1524), AppColors.voidBlack],
+          ),
+        ),
+        child: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
@@ -58,17 +67,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Power Monitor',
+                    'POWER MONITOR',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                          color: AppColors.batteryHigh,
                         ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sign in to watch AC and battery status live.',
+                    'Native home server · ThinkPad · Ubuntu',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.mutedForeground,
+                          color: AppColors.textDim,
                         ),
                   ),
                   const SizedBox(height: 32),
@@ -82,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(
                     'Default: Cloudflare tunnel. Change if the hostname rotates.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mutedForeground,
+                          color: AppColors.textDim,
                         ),
                   ),
                   const SizedBox(height: 16),
@@ -120,6 +130,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -1,18 +1,19 @@
 import 'package:dotlottie_flutter/dotlottie_flutter.dart';
 import 'package:flutter/material.dart';
 
-import '../../../theme/app_colors.dart';
+import '../../../theme/power_atmosphere.dart';
 
-/// Hero: Lottie + big charge readout.
 class StatusHero extends StatelessWidget {
   const StatusHero({
     super.key,
+    required this.atmosphere,
     required this.acConnected,
     required this.percentage,
     required this.stateLabel,
     this.subtitle,
   });
 
+  final PowerAtmosphere atmosphere;
   final bool acConnected;
   final double? percentage;
   final String stateLabel;
@@ -22,31 +23,39 @@ class StatusHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final pct = percentage?.round();
     final textTheme = Theme.of(context).textTheme;
+    final accent = atmosphere.accent;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: 220,
+          height: 240,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Soft glow behind animation
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.primary.withValues(alpha: acConnected ? 0.18 : 0.08),
-                        Colors.transparent,
-                      ],
-                      radius: 0.72,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: atmosphere.glow.withValues(alpha: 0.45),
+                      blurRadius: 80,
+                      spreadRadius: 8,
                     ),
-                  ),
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.22),
+                      blurRadius: 140,
+                      spreadRadius: 24,
+                    ),
+                  ],
                 ),
+                width: 160,
+                height: 160,
               ),
               Opacity(
-                opacity: acConnected ? 1 : 0.55,
+                opacity: acConnected ? 1 : 0.72,
                 child: const DotLottieView(
                   source: 'assets/lottie/Charging.lottie',
                   sourceType: 'asset',
@@ -54,10 +63,17 @@ class StatusHero extends StatelessWidget {
                   loop: true,
                 ),
               ),
+              Positioned(
+                top: 12,
+                child: _HudBadge(
+                  text: atmosphere.label,
+                  color: accent,
+                ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -66,20 +82,27 @@ class StatusHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    pct == null ? '—' : '$pct',
-                    style: textTheme.displayLarge?.copyWith(
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 500),
+                    style: textTheme.displayLarge!.copyWith(
                       fontWeight: FontWeight.w800,
-                      height: 0.95,
-                      letterSpacing: -2.5,
-                      fontSize: 72,
-                      color: AppColors.foreground,
+                      height: 0.92,
+                      letterSpacing: -3,
+                      fontSize: 76,
+                      color: accent,
+                      shadows: [
+                        Shadow(
+                          color: atmosphere.glow.withValues(alpha: 0.55),
+                          blurRadius: 24,
+                        ),
+                      ],
                     ),
+                    child: Text(pct == null ? '—' : '$pct'),
                   ),
                   Text(
                     '%',
                     style: textTheme.headlineSmall?.copyWith(
-                      color: AppColors.mutedForeground,
+                      color: AppColors.textDim,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -89,13 +112,25 @@ class StatusHero extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _PowerModeChip(acConnected: acConnected),
+                _PowerModeChip(
+                  acConnected: acConnected,
+                  accent: accent,
+                ),
                 const SizedBox(height: 10),
                 Text(
                   stateLabel,
                   textAlign: TextAlign.end,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  atmosphere.tagline,
+                  textAlign: TextAlign.end,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textDim,
                   ),
                 ),
                 if (subtitle != null) ...[
@@ -104,7 +139,8 @@ class StatusHero extends StatelessWidget {
                     subtitle!,
                     textAlign: TextAlign.end,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: AppColors.mutedForeground,
+                      color: atmosphere.accentSoft,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -117,41 +153,70 @@ class StatusHero extends StatelessWidget {
   }
 }
 
-class _PowerModeChip extends StatelessWidget {
-  const _PowerModeChip({required this.acConnected});
+class _HudBadge extends StatelessWidget {
+  const _HudBadge({required this.text, required this.color});
 
-  final bool acConnected;
+  final String text;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
+      duration: const Duration(milliseconds: 450),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 16),
+        ],
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+          letterSpacing: 1.6,
+        ),
+      ),
+    );
+  }
+}
+
+class _PowerModeChip extends StatelessWidget {
+  const _PowerModeChip({
+    required this.acConnected,
+    required this.accent,
+  });
+
+  final bool acConnected;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: acConnected
-            ? AppColors.primary.withValues(alpha: 0.12)
-            : AppColors.muted,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: acConnected
-              ? AppColors.primary.withValues(alpha: 0.28)
-              : AppColors.border,
-        ),
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            acConnected ? Icons.bolt_rounded : Icons.battery_std_rounded,
+            acConnected ? Icons.bolt_rounded : Icons.battery_charging_full_rounded,
             size: 16,
-            color: acConnected ? AppColors.primary : AppColors.foreground,
+            color: accent,
           ),
           const SizedBox(width: 6),
           Text(
-            acConnected ? 'Mains power' : 'On battery',
+            acConnected ? 'Mains' : 'Battery',
             style: TextStyle(
-              color: acConnected ? AppColors.primary : AppColors.foreground,
+              color: accent,
               fontWeight: FontWeight.w700,
               fontSize: 13,
             ),
