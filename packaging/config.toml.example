@@ -19,6 +19,15 @@ fully_charged = false
 low_battery = true
 critical_battery = true
 
+# Firebase credentials live in `.env`; device tokens via CLI/API.
+[push]
+enabled = true
+ac_connected = false
+ac_disconnected = true
+fully_charged = false
+low_battery = true
+critical_battery = true
+
 [battery]
 low_threshold = 20
 critical_threshold = 10

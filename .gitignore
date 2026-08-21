@@ -6,3 +6,5 @@
 *.db-*
 .env
 .env.local
+*-firebase-adminsdk*.json
+firebase-service-account.json

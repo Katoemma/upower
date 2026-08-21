@@ -49,6 +49,31 @@ Laravel-style names also work: `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDR
 
 Default recipient is `nativesenior@gmail.com` (`SMTP_TO`). Email events are configured under `[email]` in `config.toml` (AC disconnect / low / critical by default).
 
+### Firebase push (FCM)
+
+Optional. In `.env`, set either:
+
+```bash
+# Preferred (FCM HTTP v1)
+FIREBASE_CREDENTIALS=/path/to/firebase-service-account.json
+FIREBASE_PROJECT_ID=your-project-id
+
+# Or legacy server key
+FCM_SERVER_KEY=AAAA...
+```
+
+Register a phone/app device token:
+
+```bash
+power-monitor push-token add 'DEVICE_FCM_TOKEN'
+# or
+curl -X POST http://127.0.0.1:8765/api/v1/push/tokens \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"DEVICE_FCM_TOKEN"}'
+```
+
+Tokens are stored in `~/.local/share/power-monitor/fcm_tokens.txt`. Event toggles live under `[push]` in `config.toml`.
+
 ## API
 
 | Method | Path | Description |
@@ -57,6 +82,7 @@ Default recipient is `nativesenior@gmail.com` (`SMTP_TO`). Email events are conf
 | GET | `/api/v1/battery` | Battery details |
 | GET | `/api/v1/power/status` | AC connected / source |
 | GET | `/api/v1/events` | Event history (`page`, `limit`, `type`, `from`, `to`) |
+| GET/POST | `/api/v1/push/tokens` | List / register FCM device tokens |
 | WS | `/ws` | Real-time power events |
 
 ## CLI
@@ -66,6 +92,9 @@ power-monitor daemon
 power-monitor status
 power-monitor events --last 20
 power-monitor config
+power-monitor push-token add <token>
+power-monitor push-token list
+power-monitor push-token remove <token>
 power-monitor version
 ```
 

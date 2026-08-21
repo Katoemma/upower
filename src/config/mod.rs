@@ -13,6 +13,8 @@ pub struct Config {
     #[serde(default)]
     pub email: EmailConfig,
     #[serde(default)]
+    pub push: PushConfig,
+    #[serde(default)]
     pub battery: BatteryConfig,
 }
 
@@ -58,6 +60,23 @@ pub struct EmailConfig {
     pub critical_battery: bool,
 }
 
+/// Firebase push (credentials via `.env`; device tokens in fcm_tokens.txt).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PushConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_false")]
+    pub ac_connected: bool,
+    #[serde(default = "default_true")]
+    pub ac_disconnected: bool,
+    #[serde(default = "default_false")]
+    pub fully_charged: bool,
+    #[serde(default = "default_true")]
+    pub low_battery: bool,
+    #[serde(default = "default_true")]
+    pub critical_battery: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatteryConfig {
     #[serde(default = "default_low")]
@@ -72,6 +91,7 @@ impl Default for Config {
             server: ServerConfig::default(),
             notifications: NotificationConfig::default(),
             email: EmailConfig::default(),
+            push: PushConfig::default(),
             battery: BatteryConfig::default(),
         }
     }
@@ -100,6 +120,19 @@ impl Default for NotificationConfig {
 }
 
 impl Default for EmailConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ac_connected: false,
+            ac_disconnected: true,
+            fully_charged: false,
+            low_battery: true,
+            critical_battery: true,
+        }
+    }
+}
+
+impl Default for PushConfig {
     fn default() -> Self {
         Self {
             enabled: true,

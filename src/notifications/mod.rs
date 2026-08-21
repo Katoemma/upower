@@ -1,20 +1,26 @@
 use notify_rust::Notification;
 use tracing::warn;
 
-use crate::config::{EmailConfig, NotificationConfig};
+use crate::config::{EmailConfig, NotificationConfig, PushConfig};
 use crate::email::SmtpSettings;
 use crate::power::{EventType, PowerEvent};
+use crate::push::FcmClient;
 
-/// Desktop + optional email dispatch (safe to call from `spawn_blocking`).
+/// Desktop + optional email + optional FCM (safe to call from `spawn_blocking`).
 pub fn dispatch(
     desktop: &NotificationConfig,
     email_cfg: &EmailConfig,
     smtp: Option<&SmtpSettings>,
+    push_cfg: &PushConfig,
+    fcm: Option<&FcmClient>,
     event: &PowerEvent,
 ) {
     maybe_desktop(desktop, event);
     if let Some(smtp) = smtp {
         crate::email::maybe_send(email_cfg, smtp, event);
+    }
+    if let Some(fcm) = fcm {
+        fcm.maybe_send(push_cfg, event);
     }
 }
 

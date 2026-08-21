@@ -8,6 +8,7 @@ mod email;
 mod logging;
 mod notifications;
 mod power;
+mod push;
 mod upower;
 mod websocket;
 
@@ -24,11 +25,11 @@ use crate::config::Config;
 use crate::database::EventStore;
 use crate::email::SmtpSettings;
 use crate::power::{PowerEvent, PowerMonitor, PowerState};
+use crate::push::FcmClient;
 use crate::upower::UPowerClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Load `.env` from cwd (and parents) when present; ignore if missing.
     let _ = dotenvy::dotenv();
 
     let cli = Cli::parse();
@@ -37,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::Status) => cli::status().await,
         Some(Commands::Events { last }) => cli::events(last).await,
         Some(Commands::Config) => cli::show_config(),
+        Some(Commands::PushToken { action }) => cli::push_token(action),
         Some(Commands::Version) => {
             println!("power-monitor {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -58,6 +60,17 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
             "email notifications enabled (Brevo/SMTP)"
         ),
         None => info!("email notifications disabled (no SMTP_* env vars)"),
+    }
+
+    let fcm = FcmClient::from_env(&config.data_dir()).context("loading Firebase/FCM settings")?;
+    match &fcm {
+        Some(client) => info!(
+            tokens = %client.tokens_path().display(),
+            "Firebase push enabled"
+        ),
+        None => info!(
+            "Firebase push disabled (set FIREBASE_CREDENTIALS or FCM_SERVER_KEY)"
+        ),
     }
 
     info!(
@@ -94,6 +107,7 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
     let monitor_config = config.clone();
     let notif_config = config.notifications.clone();
     let email_config = config.email.clone();
+    let push_config = config.push.clone();
     let battery_config = config.battery.clone();
 
     tokio::spawn(async move {
@@ -106,6 +120,8 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
             notif_config,
             email_config,
             smtp,
+            push_config,
+            fcm,
             battery_config,
         );
         if let Err(err) = monitor.run().await {
@@ -113,7 +129,12 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
         }
     });
 
-    let app = api::router(Arc::clone(&state), Arc::clone(&store), event_tx.clone());
+    let app = api::router(
+        Arc::clone(&state),
+        Arc::clone(&store),
+        event_tx.clone(),
+        config.data_dir(),
+    );
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&addr)
         .await

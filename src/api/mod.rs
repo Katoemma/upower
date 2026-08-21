@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
@@ -10,6 +11,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::database::EventStore;
 use crate::power::{PowerEvent, PowerState};
+use crate::push;
 use crate::websocket;
 
 #[derive(Clone)]
@@ -17,17 +19,20 @@ pub struct AppState {
     pub power: Arc<RwLock<PowerState>>,
     pub store: Arc<EventStore>,
     pub events: broadcast::Sender<PowerEvent>,
+    pub data_dir: PathBuf,
 }
 
 pub fn router(
     power: Arc<RwLock<PowerState>>,
     store: Arc<EventStore>,
     events: broadcast::Sender<PowerEvent>,
+    data_dir: PathBuf,
 ) -> Router {
     let state = AppState {
         power,
         store,
         events,
+        data_dir,
     };
 
     Router::new()
@@ -35,6 +40,7 @@ pub fn router(
         .route("/api/v1/battery", get(get_battery))
         .route("/api/v1/power/status", get(get_power_status))
         .route("/api/v1/events", get(get_events))
+        .route("/api/v1/push/tokens", get(list_push_tokens).post(register_push_token))
         .route("/ws", get(websocket::ws_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -181,4 +187,48 @@ async fn get_events(
         "limit": limit,
         "events": items,
     })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PushTokenBody {
+    pub token: String,
+}
+
+async fn list_push_tokens(State(state): State<AppState>) -> Json<Value> {
+    let path = state.data_dir.join("fcm_tokens.txt");
+    let tokens = push::load_tokens_file(&path).unwrap_or_default();
+    Json(json!({
+        "count": tokens.len(),
+        "tokens": tokens,
+    }))
+}
+
+async fn register_push_token(
+    State(state): State<AppState>,
+    Json(body): Json<PushTokenBody>,
+) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
+    let path = state.data_dir.join("fcm_tokens.txt");
+    let mut tokens = push::load_tokens_file(&path).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            e.to_string(),
+        )
+    })?;
+    let token = body.token.trim().to_string();
+    if token.is_empty() {
+        return Err((
+            axum::http::StatusCode::BAD_REQUEST,
+            "token is required".into(),
+        ));
+    }
+    if !tokens.iter().any(|t| t == &token) {
+        tokens.push(token.clone());
+        push::save_tokens_file(&path, &tokens).map_err(|e| {
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                e.to_string(),
+            )
+        })?;
+    }
+    Ok(Json(json!({ "ok": true, "count": tokens.len() })))
 }

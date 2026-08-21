@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use serde_json::Value;
 
 use crate::config::Config;
+use crate::push::{self, FcmClient};
 
 #[derive(Debug, Parser)]
 #[command(name = "power-monitor", about = "Linux power monitoring daemon")]
@@ -30,8 +31,23 @@ pub enum Commands {
     },
     /// Print effective configuration path and values
     Config,
+    /// Manage Firebase Cloud Messaging device tokens
+    PushToken {
+        #[command(subcommand)]
+        action: PushTokenAction,
+    },
     /// Print version
     Version,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum PushTokenAction {
+    /// Register a device token
+    Add { token: String },
+    /// List registered tokens
+    List,
+    /// Remove a device token
+    Remove { token: String },
 }
 
 pub async fn status() -> Result<()> {
@@ -94,11 +110,73 @@ pub fn show_config() -> Result<()> {
     Ok(())
 }
 
+pub fn push_token(action: PushTokenAction) -> Result<()> {
+    let cfg = Config::load(None)?;
+    let path = push::default_tokens_path();
+    let client = FcmClient::from_env(&cfg.data_dir())?;
+    let path = client
+        .as_ref()
+        .map(|c| c.tokens_path().to_path_buf())
+        .unwrap_or(path);
+
+    match action {
+        PushTokenAction::Add { token } => {
+            if let Some(client) = &client {
+                client.add_token(&token)?;
+                let n = client.load_tokens()?.len();
+                println!("saved {n} token(s) -> {}", client.tokens_path().display());
+            } else {
+                let mut tokens = push::load_tokens_file(&path)?;
+                let token = token.trim().to_string();
+                if token.is_empty() {
+                    bail!("empty token");
+                }
+                if !tokens.iter().any(|t| t == &token) {
+                    tokens.push(token);
+                    push::save_tokens_file(&path, &tokens)?;
+                }
+                println!("saved {} token(s) -> {}", tokens.len(), path.display());
+            }
+        }
+        PushTokenAction::List => {
+            let tokens = push::load_tokens_file(&path)?;
+            println!("file: {}", path.display());
+            if tokens.is_empty() {
+                println!("(no tokens)");
+            } else {
+                for t in tokens {
+                    println!("{t}");
+                }
+            }
+        }
+        PushTokenAction::Remove { token } => {
+            if let Some(client) = &client {
+                let removed = client.remove_token(&token)?;
+                let n = client.load_tokens()?.len();
+                println!(
+                    "removed {}; {} remaining -> {}",
+                    if removed { 1 } else { 0 },
+                    n,
+                    client.tokens_path().display()
+                );
+            } else {
+                let mut tokens = push::load_tokens_file(&path)?;
+                let before = tokens.len();
+                tokens.retain(|t| t != &token);
+                push::save_tokens_file(&path, &tokens)?;
+                println!(
+                    "removed {}; {} remaining -> {}",
+                    before.saturating_sub(tokens.len()),
+                    tokens.len(),
+                    path.display()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 async fn http_get(url: &str) -> Result<Value> {
-    // Minimal HTTP GET without pulling in reqwest — use tokio TCP + manual request,
-    // or use std via blocking. Prefer a tiny approach with ureq... but we didn't add ureq.
-    // Use hyper via axum's dependency? Simpler: use std::process curl, or add reqwest.
-    // Use tokio::net + write raw HTTP for GET on localhost.
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
 
