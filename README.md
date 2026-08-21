@@ -47,7 +47,7 @@ Do **not** put `*@smtp-brevo.com` in From — that is only the SMTP login (`SMTP
 
 Laravel-style names also work: `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`.
 
-Default recipient is `nativesenior@gmail.com` (`SMTP_TO`). Email events are configured under `[email]` in `config.toml` (AC disconnect / low / critical by default).
+Default recipient is `katoemmy001@gmail.com` (`SMTP_TO`). Email events are configured under `[email]` in `config.toml` (AC disconnect / low / critical by default).
 
 ### Firebase push (FCM)
 
@@ -103,9 +103,9 @@ power-monitor version
 No public signup. Seed users via CLI only:
 
 ```bash
-power-monitor user add nativesenior@gmail.com 'your-password'
+power-monitor user add katoemmy001@gmail.com 'your-password'
 # restart daemon after first user so auth engages
-power-monitor login nativesenior@gmail.com 'your-password'
+power-monitor login katoemmy001@gmail.com 'your-password'
 power-monitor status
 ```
 

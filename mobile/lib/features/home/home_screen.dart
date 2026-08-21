@@ -140,24 +140,32 @@ class HomeScreen extends ConsumerWidget {
     return s[0].toUpperCase() + s.substring(1);
   }
 
+  String _formatDuration(int seconds) {
+    if (seconds <= 0) return '—';
+    final totalMin = (seconds / 60).round();
+    if (totalMin < 60) return '$totalMin min';
+    final h = totalMin ~/ 60;
+    final m = totalMin % 60;
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+
   String? _subtitle(PowerUiState s) {
     if (s.timeToFull != null && s.timeToFull! > 0) {
-      final m = (s.timeToFull! / 60).round();
-      return '~$m min to full';
+      return '~${_formatDuration(s.timeToFull!)} to full';
     }
     if (s.timeRemaining != null && s.timeRemaining! > 0) {
-      final m = (s.timeRemaining! / 60).round();
-      return '~$m min left';
+      return '~${_formatDuration(s.timeRemaining!)} left';
     }
     return null;
   }
 
   String _etaLabel(PowerUiState s) {
     if (s.acConnected && s.timeToFull != null && s.timeToFull! > 0) {
-      return '${(s.timeToFull! / 60).round()} min';
+      return _formatDuration(s.timeToFull!);
     }
     if (!s.acConnected && s.timeRemaining != null && s.timeRemaining! > 0) {
-      return '${(s.timeRemaining! / 60).round()} min';
+      return _formatDuration(s.timeRemaining!);
     }
     return '—';
   }

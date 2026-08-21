@@ -65,7 +65,7 @@ impl SmtpSettings {
             .and_then(|p| p.parse().ok())
             .unwrap_or(587);
         let to = first_env(&["SMTP_TO", "MAIL_TO"])
-            .unwrap_or_else(|| "nativesenior@gmail.com".into());
+            .unwrap_or_else(|| "katoemmy001@gmail.com".into());
 
         Ok(Some(Self {
             host,
