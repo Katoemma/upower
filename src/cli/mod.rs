@@ -83,6 +83,15 @@ pub enum PushTokenAction {
     List,
     /// Remove a device token
     Remove { token: String },
+    /// Send a test push to all DB tokens (or one user when --email is set)
+    Test {
+        #[arg(long)]
+        email: Option<String>,
+        #[arg(long, default_value = "Power Monitor")]
+        title: String,
+        #[arg(long, default_value = "Test push from your ThinkPad home server")]
+        body: String,
+    },
 }
 
 pub async fn status() -> Result<()> {
@@ -285,6 +294,29 @@ pub async fn push_token(action: PushTokenAction) -> Result<()> {
                 let _ = push::save_tokens_file(&path, &tokens);
             }
             println!("removed from db: {removed}");
+        }
+        PushTokenAction::Test { email, title, body } => {
+            let store = EventStore::open(&cfg.data_dir()).await?;
+            let tokens = if let Some(email) = email {
+                let Some((user, _)) = store.find_user_by_email(&email).await? else {
+                    bail!("no user with email {email}");
+                };
+                store.list_fcm_tokens_for_user(user.id).await?
+            } else {
+                store.list_all_fcm_tokens().await?
+            };
+            println!("sending test push to {} token(s)…", tokens.len());
+            let data_dir = cfg.data_dir();
+            let result = tokio::task::spawn_blocking(move || {
+                let Some(client) = FcmClient::from_env(&data_dir)? else {
+                    bail!("Firebase not configured (set FIREBASE_CREDENTIALS in .env)");
+                };
+                client.send_test(&tokens, &title, &body)
+            })
+            .await
+            .context("join push test task")??;
+            let _ = result;
+            println!("done (check phone + logs for per-token results)");
         }
     }
     Ok(())

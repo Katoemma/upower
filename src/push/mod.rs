@@ -203,6 +203,31 @@ impl FcmClient {
         }
     }
 
+    /// Send an explicit test notification to the given device tokens.
+    pub fn send_test(&self, tokens: &[String], title: &str, body: &str) -> Result<()> {
+        if tokens.is_empty() {
+            bail!("no FCM device tokens to notify");
+        }
+        let event = PowerEvent {
+            event: crate::power::EventType::AcDisconnected,
+            timestamp: chrono::Local::now(),
+            battery_percentage: None,
+            battery_state: None,
+            ac_connected: false,
+        };
+        for token in tokens {
+            match self.send_to_token(token, title, body, &event) {
+                Ok(()) => info!(token_prefix = %truncate(token), "FCM test push sent"),
+                Err(err) => warn!(
+                    error = %err,
+                    token_prefix = %truncate(token),
+                    "FCM test push failed"
+                ),
+            }
+        }
+        Ok(())
+    }
+
     fn oauth_token(&self, client_email: &str, private_key_pem: &str) -> Result<String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
