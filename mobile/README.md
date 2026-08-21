@@ -1,17 +1,26 @@
-# mobile
+# Power Monitor (Flutter)
 
-A new Flutter project.
+Mobile client for the Linux `power-monitor` daemon.
 
-## Getting Started
+## Defaults
 
-This project is a starting point for a Flutter application.
+- Server URL: `https://hostels-rolling-lol-films.trycloudflare.com`
+- WebSocket: `wss://hostels-rolling-lol-films.trycloudflare.com/ws?token=…`
+- Emulator preset: `http://10.0.2.2:8765` (Settings)
 
-A few resources to get you started if this is your first Flutter project:
+## Run
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+# Host machine: daemon + tunnel
+power-monitor daemon
+../packaging/cloudflare-tunnel.sh   # or: cloudflared tunnel --url http://127.0.0.1:8765
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# Phone
+flutter run
+```
+
+Sign in with a seeded user (`power-monitor user add …`). After login the app registers the FCM token via `POST /api/v1/push/tokens`.
+
+## Firebase
+
+`Firebase.initializeApp` uses [lib/firebase_options.dart](lib/firebase_options.dart) (FlutterFire). Android `google-services.json` is already wired.

@@ -119,3 +119,11 @@ power-monitor user set-password email@x.com 'new'
 power-monitor user notify-email email@x.com true
 power-monitor user remove email@x.com
 ```
+
+## Mobile testing (cloudflared)
+
+```bash
+bash packaging/cloudflare-tunnel.sh
+```
+
+Default Flutter Server URL: `https://hostels-rolling-lol-films.trycloudflare.com` (update in app Settings if the tunnel hostname changes).
