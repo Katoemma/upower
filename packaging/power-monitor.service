@@ -1,0 +1,17 @@
+[Unit]
+Description=Power Monitor daemon
+Documentation=file:///usr/share/doc/power-monitor/README.md
+After=network.target upower.service dbus.service
+Wants=upower.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/power-monitor daemon
+Restart=on-failure
+RestartSec=3
+Environment=RUST_LOG=info
+# Prefer least privilege; adjust User= if installed system-wide for a desktop session.
+# User=power-monitor
+
+[Install]
+WantedBy=multi-user.target

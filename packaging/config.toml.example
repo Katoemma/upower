@@ -1,0 +1,15 @@
+[server]
+host = "127.0.0.1"
+port = 8765
+
+[notifications]
+enabled = true
+ac_connected = true
+ac_disconnected = true
+fully_charged = true
+low_battery = true
+critical_battery = true
+
+[battery]
+low_threshold = 20
+critical_threshold = 10

@@ -1,0 +1,14 @@
+[Unit]
+Description=Power Monitor daemon (user)
+Documentation=file:///usr/share/doc/power-monitor/README.md
+After=dbus.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/power-monitor daemon
+Restart=on-failure
+RestartSec=3
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=default.target
