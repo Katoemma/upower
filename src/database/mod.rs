@@ -1,12 +1,16 @@
+//! SQLite persistence for events, users, and per-user FCM tokens.
+
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Local, NaiveDateTime};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
 
 use crate::power::{BatteryState, EventType, PowerEvent};
+use crate::users::{self, User};
 
+#[derive(Clone)]
 pub struct EventStore {
     pool: SqlitePool,
 }
@@ -25,24 +29,12 @@ impl EventStore {
             .await
             .with_context(|| format!("opening sqlite {}", db_path.display()))?;
 
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS power_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_type TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                battery_percentage REAL,
-                battery_state TEXT,
-                ac_connected INTEGER NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            )
-            "#,
-        )
-        .execute(&pool)
-        .await
-        .context("migrating power_events table")?;
-
+        migrate(&pool).await?;
         Ok(Self { pool })
+    }
+
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
     }
 
     pub async fn insert(&self, event: &PowerEvent) -> Result<()> {
@@ -143,4 +135,217 @@ impl EventStore {
         }
         Ok(out)
     }
+
+    // --- users ---
+
+    pub async fn user_count(&self) -> Result<i64> {
+        let row = sqlx::query("SELECT COUNT(*) AS c FROM users")
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(row.get::<i64, _>("c"))
+    }
+
+    pub async fn create_user(&self, email: &str, password: &str) -> Result<User> {
+        let email = users::normalize_email(email)?;
+        let hash = users::hash_password(password)?;
+        let res = sqlx::query(
+            "INSERT INTO users (email, password_hash, notify_email) VALUES (?, ?, 1)",
+        )
+        .bind(&email)
+        .bind(&hash)
+        .execute(&self.pool)
+        .await;
+        match res {
+            Ok(r) => Ok(User {
+                id: r.last_insert_rowid(),
+                email,
+                notify_email: true,
+            }),
+            Err(sqlx::Error::Database(err)) if err.message().contains("UNIQUE") => {
+                bail!("user already exists: {email}")
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    pub async fn list_users(&self) -> Result<Vec<User>> {
+        let rows = sqlx::query(
+            "SELECT id, email, notify_email FROM users ORDER BY email COLLATE NOCASE",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| User {
+                id: row.get::<i64, _>("id"),
+                email: row.get("email"),
+                notify_email: row.get::<i64, _>("notify_email") != 0,
+            })
+            .collect())
+    }
+
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<(User, String)>> {
+        let email = users::normalize_email(email)?;
+        let row = sqlx::query(
+            "SELECT id, email, password_hash, notify_email FROM users WHERE email = ? COLLATE NOCASE",
+        )
+        .bind(&email)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|row| {
+            (
+                User {
+                    id: row.get("id"),
+                    email: row.get("email"),
+                    notify_email: row.get::<i64, _>("notify_email") != 0,
+                },
+                row.get::<String, _>("password_hash"),
+            )
+        }))
+    }
+
+    pub async fn find_user_by_id(&self, id: i64) -> Result<Option<User>> {
+        let row = sqlx::query("SELECT id, email, notify_email FROM users WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|row| User {
+            id: row.get("id"),
+            email: row.get("email"),
+            notify_email: row.get::<i64, _>("notify_email") != 0,
+        }))
+    }
+
+    pub async fn remove_user(&self, email: &str) -> Result<bool> {
+        let email = users::normalize_email(email)?;
+        let res = sqlx::query("DELETE FROM users WHERE email = ? COLLATE NOCASE")
+            .bind(&email)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn set_password(&self, email: &str, password: &str) -> Result<bool> {
+        let email = users::normalize_email(email)?;
+        let hash = users::hash_password(password)?;
+        let res = sqlx::query("UPDATE users SET password_hash = ? WHERE email = ? COLLATE NOCASE")
+            .bind(&hash)
+            .bind(&email)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn set_notify_email(&self, email: &str, enabled: bool) -> Result<bool> {
+        let email = users::normalize_email(email)?;
+        let res = sqlx::query(
+            "UPDATE users SET notify_email = ? WHERE email = ? COLLATE NOCASE",
+        )
+        .bind(enabled as i64)
+        .bind(&email)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn notification_emails(&self) -> Result<Vec<String>> {
+        let rows = sqlx::query(
+            "SELECT email FROM users WHERE notify_email = 1 ORDER BY email COLLATE NOCASE",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.get("email")).collect())
+    }
+
+    pub async fn add_fcm_token(&self, user_id: i64, token: &str) -> Result<()> {
+        let token = token.trim();
+        if token.is_empty() {
+            bail!("empty FCM token");
+        }
+        sqlx::query(
+            r#"
+            INSERT INTO user_fcm_tokens (user_id, token)
+            VALUES (?, ?)
+            ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id
+            "#,
+        )
+        .bind(user_id)
+        .bind(token)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_fcm_tokens_for_user(&self, user_id: i64) -> Result<Vec<String>> {
+        let rows = sqlx::query("SELECT token FROM user_fcm_tokens WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.into_iter().map(|r| r.get("token")).collect())
+    }
+
+    pub async fn list_all_fcm_tokens(&self) -> Result<Vec<String>> {
+        let rows = sqlx::query("SELECT token FROM user_fcm_tokens")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.into_iter().map(|r| r.get("token")).collect())
+    }
+
+    pub async fn remove_fcm_token(&self, token: &str) -> Result<bool> {
+        let res = sqlx::query("DELETE FROM user_fcm_tokens WHERE token = ?")
+            .bind(token.trim())
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+}
+
+async fn migrate(pool: &SqlitePool) -> Result<()> {
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS power_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            battery_percentage REAL,
+            battery_state TEXT,
+            ac_connected INTEGER NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .context("migrating power_events")?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            password_hash TEXT NOT NULL,
+            notify_email INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .context("migrating users")?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS user_fcm_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .context("migrating user_fcm_tokens")?;
+
+    Ok(())
 }
