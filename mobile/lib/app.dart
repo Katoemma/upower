@@ -11,7 +11,7 @@ class PowerMonitorApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'Power Monitor',
+      title: 'Upower',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.futuristic(),
       routerConfig: router,

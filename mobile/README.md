@@ -1,4 +1,4 @@
-# Power Monitor (Flutter)
+# Upower (Flutter)
 
 Mobile client for the Linux `power-monitor` daemon.
 
