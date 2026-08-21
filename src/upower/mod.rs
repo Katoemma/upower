@@ -24,7 +24,6 @@ trait UPower {
 
     fn enumerate_devices(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
 
-    #[zbus(property)]
     fn get_display_device(&self) -> zbus::Result<OwnedObjectPath>;
 }
 
@@ -139,6 +138,25 @@ impl UPowerClient {
 
         if batteries.is_empty() {
             ac_connected = self.any_line_power_online().await.unwrap_or(ac_connected);
+        }
+
+        // DisplayDevice often omits Capacity; copy fields from a physical battery when missing.
+        let donor = batteries
+            .iter()
+            .find(|b| b.id != "DisplayDevice")
+            .cloned();
+        if let Some(donor) = donor {
+            if let Some(display) = batteries.iter_mut().find(|b| b.id == "DisplayDevice") {
+                if display.health.is_none() {
+                    display.health = donor.health;
+                }
+                if display.energy_full_design_wh.is_none() {
+                    display.energy_full_design_wh = donor.energy_full_design_wh;
+                }
+                if display.temperature_celsius.is_none() {
+                    display.temperature_celsius = donor.temperature_celsius;
+                }
+            }
         }
 
         Ok(PowerState {

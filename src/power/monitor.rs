@@ -113,7 +113,8 @@ impl PowerMonitor {
     }
 
     async fn apply_snapshot(&mut self, snapshot: PowerState) {
-        let events = self.diff(&self.prev, &snapshot);
+        let prev = self.prev.clone();
+        let events = self.diff(&prev, &snapshot);
         {
             let mut guard = self.state.write().await;
             *guard = snapshot.clone();
@@ -132,7 +133,12 @@ impl PowerMonitor {
             }
 
             let _ = self.event_tx.send(event.clone());
-            notifications::maybe_notify(&self.notif, &event);
+
+            let notif = self.notif.clone();
+            let ev = event.clone();
+            tokio::task::spawn_blocking(move || {
+                notifications::maybe_notify(&notif, &ev);
+            });
         }
 
         self.prev = snapshot;
