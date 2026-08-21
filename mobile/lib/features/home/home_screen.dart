@@ -6,7 +6,8 @@ import '../../../core/providers.dart';
 import '../../../theme/app_colors.dart';
 import '../auth/auth_controller.dart';
 import 'widgets/live_pill.dart';
-import 'widgets/metric_row.dart';
+import 'widgets/metric_tile.dart';
+import 'widgets/server_identity.dart';
 import 'widgets/status_hero.dart';
 
 final powerSnapshotProvider =
@@ -128,19 +129,31 @@ class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   String _prettyState(String raw) {
-    return raw.replaceAll('_', ' ');
+    final s = raw.replaceAll('_', ' ');
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1);
   }
 
   String? _subtitle(PowerUiState s) {
     if (s.timeToFull != null && s.timeToFull! > 0) {
       final m = (s.timeToFull! / 60).round();
-      return 'About $m min to full';
+      return '~$m min to full';
     }
     if (s.timeRemaining != null && s.timeRemaining! > 0) {
       final m = (s.timeRemaining! / 60).round();
-      return 'About $m min remaining';
+      return '~$m min left';
     }
     return null;
+  }
+
+  String _etaLabel(PowerUiState s) {
+    if (s.acConnected && s.timeToFull != null && s.timeToFull! > 0) {
+      return '${(s.timeToFull! / 60).round()} min';
+    }
+    if (!s.acConnected && s.timeRemaining != null && s.timeRemaining! > 0) {
+      return '${(s.timeRemaining! / 60).round()} min';
+    }
+    return '—';
   }
 
   @override
@@ -149,13 +162,33 @@ class HomeScreen extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: false,
       appBar: AppBar(
-        title: const Text('Power Monitor'),
+        backgroundColor: Colors.transparent,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Power Monitor',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+            ),
+            Text(
+              auth.email ?? 'Company home server',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.mutedForeground,
+                  ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Events',
             onPressed: () => context.push('/events'),
-            icon: const Icon(Icons.history),
+            icon: const Icon(Icons.history_rounded),
           ),
           IconButton(
             tooltip: 'Settings',
@@ -164,67 +197,102 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () => ref.read(powerSnapshotProvider.notifier).refresh(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    auth.email ?? '',
-                    style: const TextStyle(color: AppColors.mutedForeground),
-                  ),
-                ),
-                LivePill(connected: power.live),
-              ],
-            ),
-            const SizedBox(height: 28),
-            if (power.loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else ...[
-              StatusHero(
-                acConnected: power.acConnected,
-                percentage: power.percentage,
-                stateLabel: _prettyState(power.state),
-                subtitle: _subtitle(power),
-              ),
-              if (power.error != null) ...[
-                const SizedBox(height: 16),
-                Text(power.error!, style: const TextStyle(color: AppColors.destructive)),
-              ],
-              const SizedBox(height: 28),
-              const Divider(),
-              if (power.health != null)
-                MetricRow(
-                  label: 'Battery health',
-                  value: '${power.health!.round()}%',
-                ),
-              if (power.lastEvent != null)
-                MetricRow(
-                  label: 'Last event',
-                  value: _prettyState(power.lastEvent!),
-                ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: () => context.push('/events'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  side: const BorderSide(color: AppColors.border),
-                  foregroundColor: AppColors.foreground,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('View event history'),
-              ),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFFF8F3),
+              AppColors.background,
+              Color(0xFFF7F7F7),
             ],
-          ],
+            stops: [0, 0.35, 1],
+          ),
+        ),
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => ref.read(powerSnapshotProvider.notifier).refresh(),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 36),
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: LivePill(connected: power.live),
+              ),
+              const SizedBox(height: 8),
+              if (power.loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 80),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                )
+              else ...[
+                StatusHero(
+                  acConnected: power.acConnected,
+                  percentage: power.percentage,
+                  stateLabel: _prettyState(power.state),
+                  subtitle: _subtitle(power),
+                ),
+                if (power.error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    power.error!,
+                    style: const TextStyle(color: AppColors.destructive),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                const ServerIdentity(),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: MetricTile(
+                        icon: Icons.favorite_outline_rounded,
+                        label: 'Battery health',
+                        value: power.health == null
+                            ? '—'
+                            : '${power.health!.round()}%',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: MetricTile(
+                        icon: Icons.schedule_rounded,
+                        label: power.acConnected ? 'Time to full' : 'Runtime',
+                        value: _etaLabel(power),
+                      ),
+                    ),
+                  ],
+                ),
+                if (power.lastEvent != null) ...[
+                  const SizedBox(height: 10),
+                  MetricTile(
+                    icon: Icons.bolt_outlined,
+                    label: 'Last event',
+                    value: _prettyState(power.lastEvent!),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                FilledButton.tonal(
+                  onPressed: () => context.push('/events'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.foreground,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Event history'),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

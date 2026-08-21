@@ -2,6 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Required by dotlottie_flutter (com.github.LottieFiles:dotlottie-android)
+        maven(url = uri("https://jitpack.io"))
     }
 }
 
