@@ -16,45 +16,64 @@ pub struct SmtpSettings {
     pub port: u16,
     pub user: String,
     pub password: String,
-    pub from: String,
+    /// Verified sender address in Brevo (never the *@smtp-brevo.com login).
+    pub from_address: String,
+    pub from_name: String,
     pub to: String,
 }
 
 impl SmtpSettings {
     /// Returns `Ok(None)` when email is intentionally unconfigured.
     pub fn from_env() -> Result<Option<Self>> {
-        let host = env::var("SMTP_HOST").ok().filter(|s| !s.is_empty());
-        let user = env::var("SMTP_USER").ok().filter(|s| !s.is_empty());
-        let password = env::var("SMTP_PASSWORD")
-            .or_else(|_| env::var("SMTP_PASS"))
-            .ok()
-            .filter(|s| !s.is_empty());
-        let from = env::var("SMTP_FROM").ok().filter(|s| !s.is_empty());
+        let host = first_env(&["SMTP_HOST", "MAIL_HOST"])
+            .unwrap_or_else(|| "smtp-relay.brevo.com".into());
+        let user = first_env(&["SMTP_USER", "MAIL_USERNAME"]);
+        let password = first_env(&["SMTP_PASSWORD", "SMTP_PASS", "MAIL_PASSWORD"]);
 
-        // Partial config is an error so misconfiguration is obvious.
-        let any = host.is_some() || user.is_some() || password.is_some() || from.is_some();
-        let all = host.is_some() && user.is_some() && password.is_some() && from.is_some();
+        // Prefer explicit address (Laravel-style). SMTP_FROM may be "Name <email>".
+        let from_address = first_env(&["SMTP_FROM_ADDRESS", "MAIL_FROM_ADDRESS", "SMTP_FROM"])
+            .map(|raw| extract_email(&raw))
+            .filter(|s| !s.is_empty());
+
+        let from_name = first_env(&["SMTP_FROM_NAME", "MAIL_FROM_NAME"])
+            .or_else(|| first_env(&["SMTP_FROM"]).and_then(|raw| extract_display_name(&raw)))
+            .unwrap_or_else(|| "Power Monitor".into());
+
+        let any = user.is_some() || password.is_some() || from_address.is_some();
+        let all = user.is_some() && password.is_some() && from_address.is_some();
         if any && !all {
             return Err(anyhow!(
-                "incomplete SMTP config: set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM"
+                "incomplete SMTP config: need SMTP_USER (or MAIL_USERNAME), \
+                 SMTP_PASSWORD (or MAIL_PASSWORD), and SMTP_FROM_ADDRESS \
+                 (or MAIL_FROM_ADDRESS). From must be a sender verified in Brevo — \
+                 not your *@smtp-brevo.com login."
             ));
         }
         if !all {
             return Ok(None);
         }
 
-        let port = env::var("SMTP_PORT")
-            .ok()
+        let from_address = from_address.unwrap();
+        if from_address.ends_with("@smtp-brevo.com") {
+            return Err(anyhow!(
+                "SMTP_FROM_ADDRESS must be your verified sender email in Brevo, \
+                 not the SMTP login ({from_address})"
+            ));
+        }
+
+        let port = first_env(&["SMTP_PORT", "MAIL_PORT"])
             .and_then(|p| p.parse().ok())
             .unwrap_or(587);
-        let to = env::var("SMTP_TO").unwrap_or_else(|_| "nativesenior@gmail.com".into());
+        let to = first_env(&["SMTP_TO", "MAIL_TO"])
+            .unwrap_or_else(|| "nativesenior@gmail.com".into());
 
         Ok(Some(Self {
-            host: host.unwrap(),
+            host,
             port,
             user: user.unwrap(),
             password: password.unwrap(),
-            from: from.unwrap(),
+            from_address,
+            from_name,
             to,
         }))
     }
@@ -78,19 +97,28 @@ pub fn maybe_send(cfg: &EmailConfig, smtp: &SmtpSettings, event: &PowerEvent) {
     if let Err(err) = send(smtp, &subject, &body) {
         warn!(error = %err, "failed to send email notification");
     } else {
-        info!(to = %smtp.to, subject = %subject, "email notification sent");
+        info!(
+            to = %smtp.to,
+            from = %smtp.from_address,
+            subject = %subject,
+            "email notification sent"
+        );
     }
 }
 
 fn send(smtp: &SmtpSettings, subject: &str, body: &str) -> Result<()> {
-    let from: Mailbox = smtp
-        .from
-        .parse()
-        .with_context(|| format!("invalid SMTP_FROM address: {}", smtp.from))?;
-    let to: Mailbox = smtp
-        .to
-        .parse()
-        .with_context(|| format!("invalid SMTP_TO address: {}", smtp.to))?;
+    let from = Mailbox::new(
+        Some(smtp.from_name.clone()),
+        smtp.from_address
+            .parse()
+            .with_context(|| format!("invalid SMTP_FROM_ADDRESS: {}", smtp.from_address))?,
+    );
+    let to = Mailbox::new(
+        None,
+        smtp.to
+            .parse()
+            .with_context(|| format!("invalid SMTP_TO: {}", smtp.to))?,
+    );
 
     let email = Message::builder()
         .from(from)
@@ -106,6 +134,44 @@ fn send(smtp: &SmtpSettings, subject: &str, body: &str) -> Result<()> {
         .credentials(creds)
         .build();
 
-    mailer.send(&email).context("SMTP send")?;
+    let response = mailer.send(&email).context("SMTP send")?;
+    if !response.is_positive() {
+        return Err(anyhow!("SMTP rejected message: {response:?}"));
+    }
     Ok(())
+}
+
+fn first_env(keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|k| {
+        env::var(k).ok().and_then(|v| {
+            let v = v.trim().trim_matches('"').trim_matches('\'').trim();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v.to_string())
+            }
+        })
+    })
+}
+
+/// Pull `user@host` from `Name <user@host>` or bare address.
+fn extract_email(raw: &str) -> String {
+    let raw = raw.trim().trim_matches('"').trim_matches('\'');
+    if let (Some(start), Some(end)) = (raw.find('<'), raw.find('>')) {
+        if end > start {
+            return raw[start + 1..end].trim().to_string();
+        }
+    }
+    raw.to_string()
+}
+
+fn extract_display_name(raw: &str) -> Option<String> {
+    let raw = raw.trim().trim_matches('"').trim_matches('\'');
+    if let Some(start) = raw.find('<') {
+        let name = raw[..start].trim().trim_matches('"').trim();
+        if !name.is_empty() {
+            return Some(name.to_string());
+        }
+    }
+    None
 }

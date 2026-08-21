@@ -35,14 +35,19 @@ See `packaging/config.toml.example`. The API binds to `127.0.0.1` by default.
 
 ### Email (Brevo SMTP)
 
-Optional. Copy `.env.example` to `.env` in the project directory (or export the same vars for the systemd unit):
+Optional. Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
-# edit SMTP_USER / SMTP_PASSWORD / SMTP_FROM
 ```
 
-Default recipient is `nativesenior@gmail.com` (`SMTP_TO`). Emails are sent for AC disconnect, low battery, and critical battery by default (see `[email]` in config). Desktop notifications stay independent under `[notifications]`.
+**Required by Brevo:** `SMTP_FROM_ADDRESS` must be a **verified sender** in Brevo
+(Settings → Senders), e.g. `emmanuelkato39@gmail.com`.  
+Do **not** put `*@smtp-brevo.com` in From — that is only the SMTP login (`SMTP_USER`).
+
+Laravel-style names also work: `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`.
+
+Default recipient is `nativesenior@gmail.com` (`SMTP_TO`). Email events are configured under `[email]` in `config.toml` (AC disconnect / low / critical by default).
 
 ## API
 
