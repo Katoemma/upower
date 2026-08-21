@@ -1,6 +1,7 @@
 //! Power Monitor — Linux-native power monitoring daemon.
 
 mod api;
+mod auth;
 mod cli;
 mod config;
 mod database;
@@ -10,6 +11,7 @@ mod notifications;
 mod power;
 mod push;
 mod upower;
+mod users;
 mod websocket;
 
 use std::path::PathBuf;
@@ -20,6 +22,7 @@ use clap::Parser;
 use tokio::sync::{broadcast, RwLock};
 use tracing::{error, info};
 
+use crate::auth::AuthState;
 use crate::cli::{Cli, Commands};
 use crate::config::Config;
 use crate::database::EventStore;
@@ -38,7 +41,9 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::Status) => cli::status().await,
         Some(Commands::Events { last }) => cli::events(last).await,
         Some(Commands::Config) => cli::show_config(),
-        Some(Commands::PushToken { action }) => cli::push_token(action),
+        Some(Commands::PushToken { action }) => cli::push_token(action).await,
+        Some(Commands::User { action }) => cli::user_cmd(action).await,
+        Some(Commands::Login { email, password }) => cli::login_cmd(email, password).await,
         Some(Commands::Version) => {
             println!("power-monitor {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -82,6 +87,14 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
     let store = EventStore::open(&config.data_dir())
         .await
         .context("failed to open event database")?;
+    let user_count = store.user_count().await.unwrap_or(0);
+    let auth = AuthState::load(&config.data_dir(), user_count)
+        .context("loading auth state")?;
+    if auth.required {
+        info!(users = user_count, "API authentication required (seeded users present)");
+    } else {
+        info!("API authentication open (no seeded users yet)");
+    }
     let store = Arc::new(store);
 
     let state = Arc::new(RwLock::new(PowerState::default()));
@@ -134,6 +147,7 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
         Arc::clone(&store),
         event_tx.clone(),
         config.data_dir(),
+        auth,
     );
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&addr)

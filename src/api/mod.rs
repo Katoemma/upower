@@ -2,16 +2,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::sync::{broadcast, RwLock};
 use tower_http::trace::TraceLayer;
 
+use crate::auth::{AuthState, OptionalAuth};
 use crate::database::EventStore;
 use crate::power::{PowerEvent, PowerState};
-use crate::push;
+use crate::users;
 use crate::websocket;
 
 #[derive(Clone)]
@@ -20,6 +21,7 @@ pub struct AppState {
     pub store: Arc<EventStore>,
     pub events: broadcast::Sender<PowerEvent>,
     pub data_dir: PathBuf,
+    pub auth: AuthState,
 }
 
 pub fn router(
@@ -27,26 +29,111 @@ pub fn router(
     store: Arc<EventStore>,
     events: broadcast::Sender<PowerEvent>,
     data_dir: PathBuf,
+    auth: AuthState,
 ) -> Router {
     let state = AppState {
         power,
         store,
         events,
         data_dir,
+        auth,
     };
 
     Router::new()
+        .route("/api/v1/auth/login", post(login))
+        .route("/api/v1/auth/me", get(me))
         .route("/api/v1/power", get(get_power))
         .route("/api/v1/battery", get(get_battery))
         .route("/api/v1/power/status", get(get_power_status))
         .route("/api/v1/events", get(get_events))
-        .route("/api/v1/push/tokens", get(list_push_tokens).post(register_push_token))
+        .route(
+            "/api/v1/push/tokens",
+            get(list_push_tokens).post(register_push_token),
+        )
         .route("/ws", get(websocket::ws_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
-async fn get_power(State(state): State<AppState>) -> Json<Value> {
+#[derive(Debug, Deserialize)]
+pub struct LoginBody {
+    pub email: String,
+    pub password: String,
+}
+
+async fn login(
+    State(state): State<AppState>,
+    Json(body): Json<LoginBody>,
+) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
+    let Some((user, hash)) = state
+        .store
+        .find_user_by_email(&body.email)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    else {
+        return Err((
+            axum::http::StatusCode::UNAUTHORIZED,
+            "invalid email or password".into(),
+        ));
+    };
+
+    let ok = users::verify_password(&body.password, &hash)
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !ok {
+        return Err((
+            axum::http::StatusCode::UNAUTHORIZED,
+            "invalid email or password".into(),
+        ));
+    }
+
+    let token = state
+        .auth
+        .issue_token(&user)
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(json!({
+        "token": token,
+        "token_type": "Bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "notify_email": user.notify_email,
+        }
+    })))
+}
+
+async fn me(
+    State(state): State<AppState>,
+    OptionalAuth(user): OptionalAuth,
+) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
+    let Some(user) = user else {
+        return Err((
+            axum::http::StatusCode::UNAUTHORIZED,
+            "authentication required".into(),
+        ));
+    };
+    let fresh = state
+        .store
+        .find_user_by_id(user.id)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .unwrap_or(crate::users::User {
+            id: user.id,
+            email: user.email.clone(),
+            notify_email: true,
+        });
+    Ok(Json(json!({
+        "id": fresh.id,
+        "email": fresh.email,
+        "notify_email": fresh.notify_email,
+        "auth_required": state.auth.required,
+    })))
+}
+
+async fn get_power(
+    State(state): State<AppState>,
+    OptionalAuth(_user): OptionalAuth,
+) -> Json<Value> {
     let snap = state.power.read().await;
     let bat = snap.primary_battery();
     let mut body = json!({
@@ -78,7 +165,10 @@ async fn get_power(State(state): State<AppState>) -> Json<Value> {
     Json(body)
 }
 
-async fn get_battery(State(state): State<AppState>) -> Json<Value> {
+async fn get_battery(
+    State(state): State<AppState>,
+    OptionalAuth(_user): OptionalAuth,
+) -> Json<Value> {
     let snap = state.power.read().await;
     match snap.primary_battery() {
         None => Json(json!({ "battery": null })),
@@ -106,7 +196,6 @@ async fn get_battery(State(state): State<AppState>) -> Json<Value> {
                 body["temperature_celsius"] = json!(v);
             }
 
-            // Multi-battery list (excluding DisplayDevice duplicate when physical listed).
             let batteries: Vec<Value> = snap
                 .batteries
                 .iter()
@@ -128,7 +217,10 @@ async fn get_battery(State(state): State<AppState>) -> Json<Value> {
     }
 }
 
-async fn get_power_status(State(state): State<AppState>) -> Json<Value> {
+async fn get_power_status(
+    State(state): State<AppState>,
+    OptionalAuth(_user): OptionalAuth,
+) -> Json<Value> {
     let snap = state.power.read().await;
     Json(json!({
         "connected": snap.ac_connected,
@@ -148,6 +240,7 @@ pub struct EventsQuery {
 
 async fn get_events(
     State(state): State<AppState>,
+    OptionalAuth(_user): OptionalAuth,
     Query(q): Query<EventsQuery>,
 ) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
     let page = q.page.unwrap_or(1);
@@ -194,26 +287,39 @@ pub struct PushTokenBody {
     pub token: String,
 }
 
-async fn list_push_tokens(State(state): State<AppState>) -> Json<Value> {
-    let path = state.data_dir.join("fcm_tokens.txt");
-    let tokens = push::load_tokens_file(&path).unwrap_or_default();
-    Json(json!({
+async fn list_push_tokens(
+    State(state): State<AppState>,
+    OptionalAuth(user): OptionalAuth,
+) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
+    let tokens = if let Some(user) = user {
+        state
+            .store
+            .list_fcm_tokens_for_user(user.id)
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    } else if state.auth.required {
+        return Err((
+            axum::http::StatusCode::UNAUTHORIZED,
+            "authentication required".into(),
+        ));
+    } else {
+        state
+            .store
+            .list_all_fcm_tokens()
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    };
+    Ok(Json(json!({
         "count": tokens.len(),
         "tokens": tokens,
-    }))
+    })))
 }
 
 async fn register_push_token(
     State(state): State<AppState>,
+    OptionalAuth(user): OptionalAuth,
     Json(body): Json<PushTokenBody>,
 ) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
-    let path = state.data_dir.join("fcm_tokens.txt");
-    let mut tokens = push::load_tokens_file(&path).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            e.to_string(),
-        )
-    })?;
     let token = body.token.trim().to_string();
     if token.is_empty() {
         return Err((
@@ -221,14 +327,25 @@ async fn register_push_token(
             "token is required".into(),
         ));
     }
-    if !tokens.iter().any(|t| t == &token) {
-        tokens.push(token.clone());
-        push::save_tokens_file(&path, &tokens).map_err(|e| {
-            (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                e.to_string(),
-            )
-        })?;
-    }
+
+    let Some(user) = user else {
+        return Err((
+            axum::http::StatusCode::UNAUTHORIZED,
+            "login required to register push tokens".into(),
+        ));
+    };
+
+    state
+        .store
+        .add_fcm_token(user.id, &token)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let tokens = state
+        .store
+        .list_fcm_tokens_for_user(user.id)
+        .await
+        .unwrap_or_default();
+
     Ok(Json(json!({ "ok": true, "count": tokens.len() })))
 }

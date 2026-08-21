@@ -18,7 +18,7 @@ use crate::users::User;
 
 const TOKEN_TTL_SECS: u64 = 60 * 60 * 24 * 30; // 30 days
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthState {
     pub encoding: EncodingKey,
     pub decoding: DecodingKey,
@@ -85,8 +85,6 @@ fn load_or_create_secret(data_dir: &Path) -> Result<String> {
     }
     let mut bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut bytes);
-    let secret = hex::encode(bytes);
-    // Fallback without hex crate: use base64-ish via format
     let secret = bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
     fs::write(&path, &secret).with_context(|| format!("writing {}", path.display()))?;
     #[cfg(unix)]

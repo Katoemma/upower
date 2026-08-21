@@ -80,6 +80,16 @@ impl SmtpSettings {
 }
 
 pub fn maybe_send(cfg: &EmailConfig, smtp: &SmtpSettings, event: &PowerEvent) {
+    maybe_send_to(cfg, smtp, event, &[smtp.to.clone()]);
+}
+
+/// Send to explicit recipient list (seeded users). Falls back to `smtp.to` if empty.
+pub fn maybe_send_to(
+    cfg: &EmailConfig,
+    smtp: &SmtpSettings,
+    event: &PowerEvent,
+    recipients: &[String],
+) {
     if !cfg.enabled {
         return;
     }
@@ -94,19 +104,27 @@ pub fn maybe_send(cfg: &EmailConfig, smtp: &SmtpSettings, event: &PowerEvent) {
         return;
     };
 
-    if let Err(err) = send(smtp, &subject, &body) {
-        warn!(error = %err, "failed to send email notification");
+    let targets: Vec<&str> = if recipients.is_empty() {
+        vec![smtp.to.as_str()]
     } else {
-        info!(
-            to = %smtp.to,
-            from = %smtp.from_address,
-            subject = %subject,
-            "email notification sent"
-        );
+        recipients.iter().map(String::as_str).collect()
+    };
+
+    for to in targets {
+        if let Err(err) = send_to(smtp, to, &subject, &body) {
+            warn!(error = %err, to = %to, "failed to send email notification");
+        } else {
+            info!(
+                to = %to,
+                from = %smtp.from_address,
+                subject = %subject,
+                "email notification sent"
+            );
+        }
     }
 }
 
-fn send(smtp: &SmtpSettings, subject: &str, body: &str) -> Result<()> {
+fn send_to(smtp: &SmtpSettings, to_addr: &str, subject: &str, body: &str) -> Result<()> {
     let from = Mailbox::new(
         Some(smtp.from_name.clone()),
         smtp.from_address
@@ -115,9 +133,9 @@ fn send(smtp: &SmtpSettings, subject: &str, body: &str) -> Result<()> {
     );
     let to = Mailbox::new(
         None,
-        smtp.to
+        to_addr
             .parse()
-            .with_context(|| format!("invalid SMTP_TO: {}", smtp.to))?,
+            .with_context(|| format!("invalid recipient address: {to_addr}"))?,
     );
 
     let email = Message::builder()

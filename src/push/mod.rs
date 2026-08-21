@@ -139,6 +139,17 @@ impl FcmClient {
     }
 
     pub fn maybe_send(&self, cfg: &PushConfig, event: &PowerEvent) {
+        let tokens = match self.load_tokens() {
+            Ok(t) => t,
+            Err(err) => {
+                warn!(error = %err, "failed to load FCM tokens");
+                return;
+            }
+        };
+        self.maybe_send_to(cfg, event, &tokens);
+    }
+
+    pub fn maybe_send_to(&self, cfg: &PushConfig, event: &PowerEvent, tokens: &[String]) {
         if !cfg.enabled {
             return;
         }
@@ -153,19 +164,12 @@ impl FcmClient {
             return;
         };
 
-        let tokens = match self.load_tokens() {
-            Ok(t) => t,
-            Err(err) => {
-                warn!(error = %err, "failed to load FCM tokens");
-                return;
-            }
-        };
         if tokens.is_empty() {
             warn!("push enabled but no FCM device tokens registered");
             return;
         }
 
-        for token in &tokens {
+        for token in tokens {
             match self.send_to_token(token, &title, &body, event) {
                 Ok(()) => info!(token_prefix = %truncate(token), "FCM push sent"),
                 Err(err) => warn!(

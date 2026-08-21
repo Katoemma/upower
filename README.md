@@ -98,8 +98,24 @@ power-monitor push-token remove <token>
 power-monitor version
 ```
 
-## Uninstall
+## Users + API auth
+
+No public signup. Seed users via CLI only:
 
 ```bash
-./packaging/uninstall-user.sh
+power-monitor user add nativesenior@gmail.com 'your-password'
+# restart daemon after first user so auth engages
+power-monitor login nativesenior@gmail.com 'your-password'
+power-monitor status
+```
+
+Once any user exists, REST/WebSocket require `Authorization: Bearer <token>` (or `?token=` for WS).
+
+Alerts: emails go to users with `notify_email=true` (fallback `SMTP_TO` if none). FCM tokens registered after login are tied to that user.
+
+```bash
+power-monitor user list
+power-monitor user set-password email@x.com 'new'
+power-monitor user notify-email email@x.com true
+power-monitor user remove email@x.com
 ```

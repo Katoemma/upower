@@ -6,10 +6,12 @@ use serde_json::json;
 use tracing::debug;
 
 use crate::api::AppState;
+use crate::auth::OptionalAuth;
 
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
+    OptionalAuth(_user): OptionalAuth,
 ) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
@@ -18,7 +20,6 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
     let mut rx = state.events.subscribe();
 
-    // Snapshot on connect.
     {
         let snap = state.power.read().await;
         let pct = snap.primary_battery().and_then(|b| b.percentage);

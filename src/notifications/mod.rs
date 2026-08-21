@@ -11,16 +11,22 @@ pub fn dispatch(
     desktop: &NotificationConfig,
     email_cfg: &EmailConfig,
     smtp: Option<&SmtpSettings>,
+    email_recipients: &[String],
     push_cfg: &PushConfig,
     fcm: Option<&FcmClient>,
+    push_tokens: &[String],
     event: &PowerEvent,
 ) {
     maybe_desktop(desktop, event);
     if let Some(smtp) = smtp {
-        crate::email::maybe_send(email_cfg, smtp, event);
+        crate::email::maybe_send_to(email_cfg, smtp, event, email_recipients);
     }
     if let Some(fcm) = fcm {
-        fcm.maybe_send(push_cfg, event);
+        if push_tokens.is_empty() {
+            fcm.maybe_send(push_cfg, event);
+        } else {
+            fcm.maybe_send_to(push_cfg, event, push_tokens);
+        }
     }
 }
 

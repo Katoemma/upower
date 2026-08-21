@@ -148,6 +148,23 @@ impl PowerMonitor {
 
             let _ = self.event_tx.send(event.clone());
 
+            let email_recipients = self
+                .store
+                .notification_emails()
+                .await
+                .unwrap_or_default();
+            let mut push_tokens = self.store.list_all_fcm_tokens().await.unwrap_or_default();
+            // Also include legacy file tokens.
+            if let Some(fcm) = &self.fcm {
+                if let Ok(file_tokens) = fcm.load_tokens() {
+                    for t in file_tokens {
+                        if !push_tokens.iter().any(|x| x == &t) {
+                            push_tokens.push(t);
+                        }
+                    }
+                }
+            }
+
             let notif = self.notif.clone();
             let email_cfg = self.email.clone();
             let smtp = self.smtp.clone();
@@ -159,8 +176,10 @@ impl PowerMonitor {
                     &notif,
                     &email_cfg,
                     smtp.as_ref(),
+                    &email_recipients,
                     &push_cfg,
                     fcm.as_ref(),
+                    &push_tokens,
                     &ev,
                 );
             });
