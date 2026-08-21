@@ -33,6 +33,17 @@ Default path: `~/.config/power-monitor/config.toml`
 
 See `packaging/config.toml.example`. The API binds to `127.0.0.1` by default.
 
+### Email (Brevo SMTP)
+
+Optional. Copy `.env.example` to `.env` in the project directory (or export the same vars for the systemd unit):
+
+```bash
+cp .env.example .env
+# edit SMTP_USER / SMTP_PASSWORD / SMTP_FROM
+```
+
+Default recipient is `nativesenior@gmail.com` (`SMTP_TO`). Emails are sent for AC disconnect, low battery, and critical battery by default (see `[email]` in config). Desktop notifications stay independent under `[notifications]`.
+
 ## API
 
 | Method | Path | Description |

@@ -4,6 +4,7 @@ mod api;
 mod cli;
 mod config;
 mod database;
+mod email;
 mod logging;
 mod notifications;
 mod power;
@@ -21,11 +22,15 @@ use tracing::{error, info};
 use crate::cli::{Cli, Commands};
 use crate::config::Config;
 use crate::database::EventStore;
+use crate::email::SmtpSettings;
 use crate::power::{PowerEvent, PowerMonitor, PowerState};
 use crate::upower::UPowerClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load `.env` from cwd (and parents) when present; ignore if missing.
+    let _ = dotenvy::dotenv();
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -45,6 +50,16 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
 
     let config = Config::load(config_path.as_deref())
         .context("failed to load configuration")?;
+    let smtp = SmtpSettings::from_env().context("loading SMTP settings from environment")?;
+    match &smtp {
+        Some(s) => info!(
+            host = %s.host,
+            to = %s.to,
+            "email notifications enabled (Brevo/SMTP)"
+        ),
+        None => info!("email notifications disabled (no SMTP_* env vars)"),
+    }
+
     info!(
         host = %config.server.host,
         port = config.server.port,
@@ -63,7 +78,6 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
         .await
         .context("failed to connect to UPower over D-Bus")?;
 
-    // Initial snapshot
     let snapshot = client
         .read_snapshot()
         .await
@@ -79,6 +93,7 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
     let monitor_store = Arc::clone(&store);
     let monitor_config = config.clone();
     let notif_config = config.notifications.clone();
+    let email_config = config.email.clone();
     let battery_config = config.battery.clone();
 
     tokio::spawn(async move {
@@ -89,6 +104,8 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
             monitor_store,
             monitor_config,
             notif_config,
+            email_config,
+            smtp,
             battery_config,
         );
         if let Err(err) = monitor.run().await {

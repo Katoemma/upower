@@ -4,3 +4,5 @@
 .vscode/
 *.db
 *.db-*
+.env
+.env.local

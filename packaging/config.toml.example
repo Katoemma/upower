@@ -10,6 +10,15 @@ fully_charged = true
 low_battery = true
 critical_battery = true
 
+# SMTP credentials live in `.env` (see `.env.example`), not here.
+[email]
+enabled = true
+ac_connected = false
+ac_disconnected = true
+fully_charged = false
+low_battery = true
+critical_battery = true
+
 [battery]
 low_threshold = 20
 critical_threshold = 10

@@ -5,8 +5,9 @@ use anyhow::Result;
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 
-use crate::config::{BatteryConfig, Config, NotificationConfig};
+use crate::config::{BatteryConfig, Config, EmailConfig, NotificationConfig};
 use crate::database::EventStore;
+use crate::email::SmtpSettings;
 use crate::notifications;
 use crate::power::{BatteryState, EventType, PowerEvent, PowerState};
 use crate::upower::UPowerClient;
@@ -19,6 +20,8 @@ pub struct PowerMonitor {
     #[allow(dead_code)]
     config: Config,
     notif: NotificationConfig,
+    email: EmailConfig,
+    smtp: Option<SmtpSettings>,
     battery: BatteryConfig,
     prev: PowerState,
     /// Track whether we already fired low/critical for this discharge cycle.
@@ -34,6 +37,8 @@ impl PowerMonitor {
         store: Arc<EventStore>,
         config: Config,
         notif: NotificationConfig,
+        email: EmailConfig,
+        smtp: Option<SmtpSettings>,
         battery: BatteryConfig,
     ) -> Self {
         Self {
@@ -43,6 +48,8 @@ impl PowerMonitor {
             store,
             config,
             notif,
+            email,
+            smtp,
             battery,
             prev: PowerState::default(),
             fired_low: false,
@@ -135,9 +142,11 @@ impl PowerMonitor {
             let _ = self.event_tx.send(event.clone());
 
             let notif = self.notif.clone();
+            let email_cfg = self.email.clone();
+            let smtp = self.smtp.clone();
             let ev = event.clone();
             tokio::task::spawn_blocking(move || {
-                notifications::maybe_notify(&notif, &ev);
+                notifications::dispatch(&notif, &email_cfg, smtp.as_ref(), &ev);
             });
         }
 

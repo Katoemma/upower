@@ -11,6 +11,8 @@ pub struct Config {
     #[serde(default)]
     pub notifications: NotificationConfig,
     #[serde(default)]
+    pub email: EmailConfig,
+    #[serde(default)]
     pub battery: BatteryConfig,
 }
 
@@ -38,6 +40,24 @@ pub struct NotificationConfig {
     pub critical_battery: bool,
 }
 
+/// Email alerts (SMTP credentials come from `.env`, not this file).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// AC connect emails are noisy; off by default.
+    #[serde(default = "default_false")]
+    pub ac_connected: bool,
+    #[serde(default = "default_true")]
+    pub ac_disconnected: bool,
+    #[serde(default = "default_false")]
+    pub fully_charged: bool,
+    #[serde(default = "default_true")]
+    pub low_battery: bool,
+    #[serde(default = "default_true")]
+    pub critical_battery: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatteryConfig {
     #[serde(default = "default_low")]
@@ -51,6 +71,7 @@ impl Default for Config {
         Self {
             server: ServerConfig::default(),
             notifications: NotificationConfig::default(),
+            email: EmailConfig::default(),
             battery: BatteryConfig::default(),
         }
     }
@@ -78,6 +99,19 @@ impl Default for NotificationConfig {
     }
 }
 
+impl Default for EmailConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ac_connected: false,
+            ac_disconnected: true,
+            fully_charged: false,
+            low_battery: true,
+            critical_battery: true,
+        }
+    }
+}
+
 impl Default for BatteryConfig {
     fn default() -> Self {
         Self {
@@ -97,6 +131,10 @@ fn default_port() -> u16 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_false() -> bool {
+    false
 }
 
 fn default_low() -> u8 {
@@ -122,7 +160,6 @@ impl Config {
             return Ok(cfg);
         }
 
-        // Ensure config dir exists and write a default file for discoverability.
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).ok();
         }
