@@ -161,7 +161,74 @@ Tune `[email]`, `[push]`, and `[battery]` thresholds as needed.
 
 ## 5. Secrets (SMTP + Firebase)
 
-Create env file on the **homelab** (not the repo root — systemd reads this path):
+On the homelab, systemd loads **`~/.config/power-monitor/.env`** (not the repo-root `.env` used during dev on your test machine).
+
+### Copy from your test machine over SSH (recommended)
+
+**Run on the test machine (lenovo), not on the homelab.**  
+If you run `scp` while SSH'd into NATIVE-JULIUS, paths like `~/Desktop/server-tools/upower/.env` will not exist.
+
+One-shot script (from repo root on **test machine**):
+
+```bash
+cd ~/Desktop/server-tools/upower
+./packaging/copy-to-homelab.sh user@192.168.100.37
+```
+
+This copies:
+
+| Source (test machine) | Destination (homelab) |
+|-----------------------|------------------------|
+| `upower/.env` | `~/.config/power-monitor/.env` |
+| `~/.config/power-monitor/firebase-service-account.json` | same path |
+| `~/.config/power-monitor/config.toml` (if present) | same path |
+| `~/.local/share/power-monitor/` (DB, users, tokens) | same path |
+
+It also rewrites `FIREBASE_CREDENTIALS` to the homelab user's home dir and restarts `power-monitor`.
+
+Manual equivalent (still on **test machine**):
+
+```bash
+HOMELAB=user@192.168.100.37
+
+# Ensure remote config dir exists
+ssh "$HOMELAB" 'mkdir -p ~/.config/power-monitor ~/.local/share/power-monitor && chmod 700 ~/.config/power-monitor'
+
+# Repo .env (test machine) → homelab systemd env file
+scp ~/Desktop/server-tools/upower/.env \
+  "$HOMELAB:~/.config/power-monitor/.env"
+
+# Firebase service account JSON
+scp ~/.config/power-monitor/firebase-service-account.json \
+  "$HOMELAB:~/.config/power-monitor/"
+
+# Optional: event DB + seeded users + FCM tokens
+rsync -av ~/.local/share/power-monitor/ "$HOMELAB:~/.local/share/power-monitor/"
+```
+
+On the **homelab**, fix the Firebase path if your Linux username differs from the test box (e.g. `lenovo` → `user`):
+
+```bash
+nano ~/.config/power-monitor/.env
+```
+
+Set:
+
+```bash
+FIREBASE_CREDENTIALS=/home/user/.config/power-monitor/firebase-service-account.json
+```
+
+Then lock permissions and restart:
+
+```bash
+chmod 600 ~/.config/power-monitor/.env ~/.config/power-monitor/firebase-service-account.json
+systemctl --user restart power-monitor
+journalctl --user -u power-monitor -n 20 --no-pager
+```
+
+Look for `email notifications enabled` and `Firebase push enabled` in the logs.
+
+### Create manually (if not copying)
 
 ```bash
 cp ~/upower/.env.example ~/.config/power-monitor/.env
@@ -181,18 +248,18 @@ SMTP_FROM_NAME=Astra
 SMTP_TO=katoemmy001@gmail.com
 ```
 
-**Firebase push (FCM HTTP v1)** — copy the service account JSON from the test machine:
+**Firebase push (FCM HTTP v1)** — if not using `scp` above:
 
 ```bash
 # On test machine
 scp ~/.config/power-monitor/firebase-service-account.json \
-  homelab-user@HOMELAB_IP:~/.config/power-monitor/
+  user@192.168.100.37:~/.config/power-monitor/
 ```
 
 On the homelab `.env`:
 
 ```bash
-FIREBASE_CREDENTIALS=/home/YOUR_USER/.config/power-monitor/firebase-service-account.json
+FIREBASE_CREDENTIALS=/home/user/.config/power-monitor/firebase-service-account.json
 FIREBASE_PROJECT_ID=native-server
 ```
 
@@ -324,22 +391,28 @@ To keep event history, users, and FCM tokens:
 # On test machine — stop daemon first
 pkill -f 'power-monitor daemon' || true
 
-rsync -av \
-  ~/.config/power-monitor/ \
-  homelab-user@HOMELAB_IP:~/.config/power-monitor/
-
-rsync -av \
-  ~/.local/share/power-monitor/ \
-  homelab-user@HOMELAB_IP:~/.local/share/power-monitor/
+cd ~/Desktop/server-tools/upower
+./packaging/copy-to-homelab.sh user@192.168.100.37
 ```
 
-On the homelab:
+Or manually:
 
 ```bash
+HOMELAB=user@192.168.100.37
+ssh "$HOMELAB" 'mkdir -p ~/.config/power-monitor ~/.local/share/power-monitor'
+scp ~/Desktop/server-tools/upower/.env "$HOMELAB:~/.config/power-monitor/.env"
+scp ~/.config/power-monitor/firebase-service-account.json "$HOMELAB:~/.config/power-monitor/"
+rsync -av ~/.local/share/power-monitor/ "$HOMELAB:~/.local/share/power-monitor/"
+```
+
+The copy script fixes `FIREBASE_CREDENTIALS` automatically. If you copied manually, on the homelab set it to `/home/user/.config/power-monitor/firebase-service-account.json`, then:
+
+```bash
+chmod 600 ~/.config/power-monitor/.env ~/.config/power-monitor/firebase-service-account.json
 systemctl --user restart power-monitor
 ```
 
-**Fresh start instead:** skip rsync; only copy `.env` + Firebase JSON and re-run `user add` + phone login.
+**Fresh start instead:** skip data rsync; only copy `.env` + Firebase JSON and re-run `user add` + phone login.
 
 ---
 
