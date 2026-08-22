@@ -9,6 +9,7 @@ ExecStart=%h/.local/bin/power-monitor daemon
 Restart=on-failure
 RestartSec=3
 Environment=RUST_LOG=info
+EnvironmentFile=-%h/.config/power-monitor/.env
 
 [Install]
 WantedBy=default.target
