@@ -5,8 +5,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'config.dart';
 
-typedef WsMessageHandler = void Function(Map<String, dynamic> message);
-
 class WsClient {
   WsClient(this._config);
 
@@ -15,9 +13,13 @@ class WsClient {
   StreamSubscription? _sub;
   Timer? _reconnect;
   String? _token;
-  WsMessageHandler? onMessage;
-  void Function(bool connected)? onConnectionChanged;
   bool _wanted = false;
+
+  final _messages = StreamController<Map<String, dynamic>>.broadcast();
+  final _connection = StreamController<bool>.broadcast();
+
+  Stream<Map<String, dynamic>> get messages => _messages.stream;
+  Stream<bool> get connection => _connection.stream;
 
   bool get isConnected => _channel != null;
 
@@ -33,22 +35,22 @@ class WsClient {
     _sub?.cancel();
     _channel?.sink.close();
     _channel = null;
-    onConnectionChanged?.call(false);
+    _connection.add(false);
   }
 
   void _open() {
     _sub?.cancel();
     _channel?.sink.close();
     try {
-      final uri = _config.wsUri(token: _token);
+      final uri = _config.streamUri(token: _token);
       final channel = WebSocketChannel.connect(uri);
       _channel = channel;
-      onConnectionChanged?.call(true);
+      _connection.add(true);
       _sub = channel.stream.listen(
         (raw) {
           try {
             final map = jsonDecode(raw as String) as Map<String, dynamic>;
-            onMessage?.call(map);
+            _messages.add(map);
           } catch (_) {}
         },
         onError: (_) => _scheduleReconnect(),
@@ -60,7 +62,7 @@ class WsClient {
   }
 
   void _scheduleReconnect() {
-    onConnectionChanged?.call(false);
+    _connection.add(false);
     _channel = null;
     if (!_wanted) return;
     _reconnect?.cancel();

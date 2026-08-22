@@ -23,6 +23,17 @@ class AppConfig {
     );
   }
 
+  /// Live telemetry: memory, CPU, storage, processes + power events.
+  Uri streamUri({String? token}) {
+    final base = baseUri;
+    final scheme = base.scheme == 'https' ? 'wss' : 'ws';
+    return base.replace(
+      scheme: scheme,
+      path: '/api/v1/stream',
+      queryParameters: token == null || token.isEmpty ? null : {'token': token},
+    );
+  }
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     _serverUrl = prefs.getString(_key) ?? defaultServerUrl;

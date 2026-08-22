@@ -16,6 +16,8 @@ pub struct Config {
     pub push: PushConfig,
     #[serde(default)]
     pub battery: BatteryConfig,
+    #[serde(default)]
+    pub monitoring: MonitoringConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +87,20 @@ pub struct BatteryConfig {
     pub critical_threshold: u8,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitoringConfig {
+    #[serde(default = "default_memory_interval")]
+    pub memory_interval_ms: u64,
+    #[serde(default = "default_cpu_interval")]
+    pub cpu_interval_ms: u64,
+    #[serde(default = "default_storage_interval")]
+    pub storage_interval_ms: u64,
+    #[serde(default = "default_processes_interval")]
+    pub processes_interval_ms: u64,
+    #[serde(default = "default_process_limit")]
+    pub process_limit: usize,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -93,6 +109,7 @@ impl Default for Config {
             email: EmailConfig::default(),
             push: PushConfig::default(),
             battery: BatteryConfig::default(),
+            monitoring: MonitoringConfig::default(),
         }
     }
 }
@@ -154,6 +171,18 @@ impl Default for BatteryConfig {
     }
 }
 
+impl Default for MonitoringConfig {
+    fn default() -> Self {
+        Self {
+            memory_interval_ms: default_memory_interval(),
+            cpu_interval_ms: default_cpu_interval(),
+            storage_interval_ms: default_storage_interval(),
+            processes_interval_ms: default_processes_interval(),
+            process_limit: default_process_limit(),
+        }
+    }
+}
+
 fn default_host() -> String {
     "127.0.0.1".into()
 }
@@ -176,6 +205,26 @@ fn default_low() -> u8 {
 
 fn default_critical() -> u8 {
     10
+}
+
+fn default_memory_interval() -> u64 {
+    1000
+}
+
+fn default_cpu_interval() -> u64 {
+    1000
+}
+
+fn default_storage_interval() -> u64 {
+    5000
+}
+
+fn default_processes_interval() -> u64 {
+    2000
+}
+
+fn default_process_limit() -> usize {
+    20
 }
 
 impl Config {

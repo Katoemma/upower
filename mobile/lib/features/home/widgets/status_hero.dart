@@ -29,9 +29,10 @@ class StatusHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: 240,
+          height: 168,
           child: Stack(
             alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 700),
@@ -41,30 +42,34 @@ class StatusHero extends StatelessWidget {
                   boxShadow: [
                     BoxShadow(
                       color: atmosphere.glow.withValues(alpha: 0.45),
-                      blurRadius: 80,
-                      spreadRadius: 8,
+                      blurRadius: 64,
+                      spreadRadius: 4,
                     ),
                     BoxShadow(
                       color: accent.withValues(alpha: 0.22),
-                      blurRadius: 140,
-                      spreadRadius: 24,
+                      blurRadius: 100,
+                      spreadRadius: 16,
                     ),
                   ],
                 ),
-                width: 160,
-                height: 160,
+                width: 120,
+                height: 120,
               ),
-              Opacity(
-                opacity: acConnected ? 1 : 0.72,
-                child: const DotLottieView(
-                  source: 'assets/lottie/Charging.lottie',
-                  sourceType: 'asset',
-                  autoplay: true,
-                  loop: true,
+              SizedBox(
+                width: 132,
+                height: 132,
+                child: Opacity(
+                  opacity: acConnected ? 1 : 0.72,
+                  child: const DotLottieView(
+                    source: 'assets/lottie/Charging.lottie',
+                    sourceType: 'asset',
+                    autoplay: true,
+                    loop: true,
+                  ),
                 ),
               ),
               Positioned(
-                top: 12,
+                top: 0,
                 child: _HudBadge(
                   text: atmosphere.label,
                   color: accent,
@@ -73,8 +78,9 @@ class StatusHero extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 4),
-        Row(
+        Transform.translate(
+          offset: const Offset(0, -8),
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
@@ -147,6 +153,7 @@ class StatusHero extends StatelessWidget {
               ],
             ),
           ],
+          ),
         ),
       ],
     );

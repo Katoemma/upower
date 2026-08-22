@@ -51,6 +51,11 @@ class ApiClient {
     return res.data ?? {};
   }
 
+  Future<Map<String, dynamic>> system() async {
+    final res = await _dio.get<Map<String, dynamic>>('/api/v1/system');
+    return res.data ?? {};
+  }
+
   Future<Map<String, dynamic>> events({int page = 1, int limit = 50}) async {
     final res = await _dio.get<Map<String, dynamic>>(
       '/api/v1/events',

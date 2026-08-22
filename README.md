@@ -81,9 +81,17 @@ Tokens are stored in `~/.local/share/power-monitor/fcm_tokens.txt`. Event toggle
 | GET | `/api/v1/power` | Current power + battery summary |
 | GET | `/api/v1/battery` | Battery details |
 | GET | `/api/v1/power/status` | AC connected / source |
+| GET | `/api/v1/memory` | RAM + swap snapshot |
+| GET | `/api/v1/cpu` | CPU usage (global + per-core) |
+| GET | `/api/v1/storage` | Mounted filesystems / disk usage |
+| GET | `/api/v1/processes` | Top processes by memory |
+| GET | `/api/v1/system` | Combined snapshot (CPU, RAM, storage, processes, power) |
 | GET | `/api/v1/events` | Event history (`page`, `limit`, `type`, `from`, `to`) |
 | GET/POST | `/api/v1/push/tokens` | List / register FCM device tokens |
-| WS | `/ws` | Real-time power events |
+| WS | `/ws` | Real-time power events (legacy mobile client) |
+| WS | `/api/v1/stream` | Live telemetry: memory, CPU, storage, processes + power events |
+
+Sampling intervals are configured under `[monitoring]` in `config.toml`.
 
 ## CLI
 

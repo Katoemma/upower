@@ -1,3 +1,5 @@
+mod system;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -12,29 +14,36 @@ use tower_http::trace::TraceLayer;
 use crate::auth::{AuthState, OptionalAuth};
 use crate::database::EventStore;
 use crate::power::{PowerEvent, PowerState};
+use crate::system::{SystemSnapshot, TelemetryFrame};
 use crate::users;
 use crate::websocket;
 
 #[derive(Clone)]
 pub struct AppState {
     pub power: Arc<RwLock<PowerState>>,
+    pub system: Arc<RwLock<SystemSnapshot>>,
     pub store: Arc<EventStore>,
     pub events: broadcast::Sender<PowerEvent>,
+    pub telemetry: broadcast::Sender<TelemetryFrame>,
     pub data_dir: PathBuf,
     pub auth: AuthState,
 }
 
 pub fn router(
     power: Arc<RwLock<PowerState>>,
+    system: Arc<RwLock<SystemSnapshot>>,
     store: Arc<EventStore>,
     events: broadcast::Sender<PowerEvent>,
+    telemetry: broadcast::Sender<TelemetryFrame>,
     data_dir: PathBuf,
     auth: AuthState,
 ) -> Router {
     let state = AppState {
         power,
+        system,
         store,
         events,
+        telemetry,
         data_dir,
         auth,
     };
@@ -45,12 +54,18 @@ pub fn router(
         .route("/api/v1/power", get(get_power))
         .route("/api/v1/battery", get(get_battery))
         .route("/api/v1/power/status", get(get_power_status))
+        .route("/api/v1/memory", get(system::get_memory))
+        .route("/api/v1/cpu", get(system::get_cpu))
+        .route("/api/v1/storage", get(system::get_storage))
+        .route("/api/v1/processes", get(system::get_processes))
+        .route("/api/v1/system", get(system::get_system))
         .route("/api/v1/events", get(get_events))
         .route(
             "/api/v1/push/tokens",
             get(list_push_tokens).post(register_push_token),
         )
         .route("/ws", get(websocket::ws_handler))
+        .route("/api/v1/stream", get(websocket::stream_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

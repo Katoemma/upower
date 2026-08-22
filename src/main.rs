@@ -10,6 +10,7 @@ mod logging;
 mod notifications;
 mod power;
 mod push;
+mod system;
 mod upower;
 mod users;
 mod websocket;
@@ -29,6 +30,7 @@ use crate::database::EventStore;
 use crate::email::SmtpSettings;
 use crate::power::{PowerEvent, PowerMonitor, PowerState};
 use crate::push::FcmClient;
+use crate::system::{SystemMonitor, SystemSnapshot, TelemetryFrame};
 use crate::upower::UPowerClient;
 
 #[tokio::main]
@@ -98,7 +100,9 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
     let store = Arc::new(store);
 
     let state = Arc::new(RwLock::new(PowerState::default()));
+    let system_state = Arc::new(RwLock::new(SystemSnapshot::default()));
     let (event_tx, _) = broadcast::channel::<PowerEvent>(256);
+    let (telemetry_tx, _) = broadcast::channel::<TelemetryFrame>(512);
 
     let client = UPowerClient::connect()
         .await
@@ -142,10 +146,20 @@ async fn run_daemon(config_path: Option<PathBuf>) -> anyhow::Result<()> {
         }
     });
 
+    let sys_state = Arc::clone(&system_state);
+    let sys_telemetry = telemetry_tx.clone();
+    let monitoring_config = config.monitoring.clone();
+    tokio::spawn(async move {
+        let monitor = SystemMonitor::new(sys_state, sys_telemetry, monitoring_config);
+        monitor.run().await;
+    });
+
     let app = api::router(
         Arc::clone(&state),
+        Arc::clone(&system_state),
         Arc::clone(&store),
         event_tx.clone(),
+        telemetry_tx.clone(),
         config.data_dir(),
         auth,
     );

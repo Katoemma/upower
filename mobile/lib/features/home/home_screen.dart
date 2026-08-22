@@ -3,133 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/providers.dart';
+import '../../../core/system_models.dart';
 import '../../../theme/power_atmosphere.dart';
 import '../auth/auth_controller.dart';
+import '../system/system_controller.dart';
+import 'power_controller.dart';
 import 'widgets/live_pill.dart';
 import 'widgets/metric_tile.dart';
+import 'widgets/process_tile.dart';
+import 'widgets/radial_gauge.dart';
 import 'widgets/server_identity.dart';
 import 'widgets/status_hero.dart';
-
-final powerSnapshotProvider =
-    StateNotifierProvider<PowerController, PowerUiState>((ref) {
-  return PowerController(ref);
-});
-
-class PowerUiState {
-  const PowerUiState({
-    this.acConnected = false,
-    this.percentage,
-    this.state = 'unknown',
-    this.health,
-    this.timeRemaining,
-    this.timeToFull,
-    this.live = false,
-    this.lastEvent,
-    this.error,
-    this.loading = true,
-  });
-
-  final bool acConnected;
-  final double? percentage;
-  final String state;
-  final double? health;
-  final int? timeRemaining;
-  final int? timeToFull;
-  final bool live;
-  final String? lastEvent;
-  final String? error;
-  final bool loading;
-
-  PowerAtmosphere get atmosphere => PowerAtmosphere.fromPower(
-        acConnected: acConnected,
-        percentage: percentage,
-      );
-
-  PowerUiState copyWith({
-    bool? acConnected,
-    double? percentage,
-    String? state,
-    double? health,
-    int? timeRemaining,
-    int? timeToFull,
-    bool? live,
-    String? lastEvent,
-    String? error,
-    bool? loading,
-    bool clearError = false,
-  }) {
-    return PowerUiState(
-      acConnected: acConnected ?? this.acConnected,
-      percentage: percentage ?? this.percentage,
-      state: state ?? this.state,
-      health: health ?? this.health,
-      timeRemaining: timeRemaining ?? this.timeRemaining,
-      timeToFull: timeToFull ?? this.timeToFull,
-      live: live ?? this.live,
-      lastEvent: lastEvent ?? this.lastEvent,
-      error: clearError ? null : (error ?? this.error),
-      loading: loading ?? this.loading,
-    );
-  }
-}
-
-class PowerController extends StateNotifier<PowerUiState> {
-  PowerController(this._ref) : super(const PowerUiState()) {
-    _bindWs();
-    refresh();
-  }
-
-  final Ref _ref;
-
-  void _bindWs() {
-    final ws = _ref.read(wsClientProvider);
-    ws.onConnectionChanged = (c) {
-      state = state.copyWith(live: c);
-    };
-    ws.onMessage = (msg) {
-      final type = msg['type'] as String?;
-      if (type == 'snapshot' || type == 'power_event') {
-        final ac = msg['ac_connected'] as bool? ?? state.acConnected;
-        final pct = (msg['battery_percentage'] as num?)?.toDouble();
-        final st = msg['state']?.toString() ??
-            msg['event']?.toString() ??
-            state.state;
-        state = state.copyWith(
-          acConnected: ac,
-          percentage: pct ?? state.percentage,
-          state: st,
-          lastEvent: type == 'power_event'
-              ? (msg['event']?.toString() ?? state.lastEvent)
-              : state.lastEvent,
-          loading: false,
-        );
-      }
-    };
-  }
-
-  Future<void> refresh() async {
-    final api = _ref.read(apiClientProvider);
-    try {
-      final data = await api.power();
-      state = state.copyWith(
-        acConnected: data['ac_connected'] as bool? ?? false,
-        percentage: (data['battery_percentage'] as num?)?.toDouble(),
-        state: data['state']?.toString() ?? 'unknown',
-        health: (data['battery_health'] as num?)?.toDouble(),
-        timeRemaining: (data['time_remaining_seconds'] as num?)?.toInt(),
-        timeToFull: (data['time_to_full_seconds'] as num?)?.toInt(),
-        loading: false,
-        clearError: true,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        loading: false,
-        error: api.describeError(e),
-      );
-    }
-  }
-}
+import 'widgets/storage_bar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -170,11 +55,26 @@ class HomeScreen extends ConsumerWidget {
     return '—';
   }
 
+  Future<void> _refresh(WidgetRef ref) async {
+    await Future.wait([
+      ref.read(powerSnapshotProvider.notifier).refresh(),
+      ref.read(systemSnapshotProvider.notifier).refresh(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final power = ref.watch(powerSnapshotProvider);
+    final system = ref.watch(systemSnapshotProvider);
     final auth = ref.watch(authControllerProvider);
-    final atmo = power.atmosphere;
+    final atmo = PowerAtmosphere.fromPower(
+      acConnected: power.acConnected,
+      percentage: power.percentage,
+    );
+
+    final maxProcMem = system.processes.isEmpty
+        ? 0
+        : system.processes.map((p) => p.memoryBytes).reduce((a, b) => a > b ? a : b);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
@@ -206,7 +106,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                 ),
                 Text(
-                  auth.email ?? 'home-server',
+                  auth.email ?? 'ThinkPad · Ubuntu',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textDim,
                       ),
@@ -229,7 +129,7 @@ class HomeScreen extends ConsumerWidget {
           body: RefreshIndicator(
             color: atmo.accent,
             backgroundColor: AppColors.panel,
-            onRefresh: () => ref.read(powerSnapshotProvider.notifier).refresh(),
+            onRefresh: () => _refresh(ref),
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
@@ -241,7 +141,7 @@ class HomeScreen extends ConsumerWidget {
                   child: LivePill(connected: power.live, atmosphere: atmo),
                 ),
                 const SizedBox(height: 4),
-                if (power.loading)
+                if (power.loading && system.loading)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 80),
                     child: Center(
@@ -263,9 +163,126 @@ class HomeScreen extends ConsumerWidget {
                       style: const TextStyle(color: AppColors.destructive),
                     ),
                   ],
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 10),
                   ServerIdentity(atmosphere: atmo),
                   const SizedBox(height: 14),
+                  Text(
+                    'SYSTEM TELEMETRY',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: atmo.accent,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.4,
+                        ),
+                  ),
+                  const SizedBox(height: 14),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final gaugeSize =
+                          (constraints.maxWidth / 3).clamp(72.0, 108.0);
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: RadialGauge(
+                              value: system.cpu.usagePercent,
+                              label: 'CPU',
+                              accent: AppColors.batteryHigh,
+                              subtitle: '${system.cpu.cores} cores',
+                              size: gaugeSize,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadialGauge(
+                              value: system.memory.usagePercent,
+                              label: 'RAM',
+                              accent: atmo.accent,
+                              subtitle: formatBytes(system.memory.usedBytes),
+                              size: gaugeSize,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadialGauge(
+                              value: power.percentage ?? 0,
+                              label: 'Battery',
+                              accent: atmo.accentSoft,
+                              size: gaugeSize,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: MetricTile(
+                          atmosphere: atmo,
+                          icon: Icons.memory_rounded,
+                          label: 'Available RAM',
+                          value: formatBytes(system.memory.availableBytes),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: MetricTile(
+                          atmosphere: atmo,
+                          icon: Icons.swap_horiz_rounded,
+                          label: 'Swap used',
+                          value: formatBytes(system.memory.swapUsedBytes),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (system.storage.isNotEmpty) ...[
+                    const SizedBox(height: 22),
+                    Text(
+                      'STORAGE',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: atmo.accentSoft,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    ...system.storage.map(
+                      (m) => StorageBar(mount: m, atmosphere: atmo),
+                    ),
+                  ],
+                  if (system.processes.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'TOP PROCESSES',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: atmo.accentSoft,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.panel.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: atmo.accent.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Column(
+                        children: system.processes
+                            .take(8)
+                            .map(
+                              (p) => ProcessTile(
+                                process: p,
+                                atmosphere: atmo,
+                                maxMemory: maxProcMem,
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
                   Row(
                     children: [
                       Expanded(
