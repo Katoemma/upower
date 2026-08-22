@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/glass_panel.dart';
 
 class EventTile extends StatelessWidget {
   const EventTile({
@@ -9,13 +10,15 @@ class EventTile extends StatelessWidget {
     required this.event,
     required this.timestamp,
     this.batteryPercentage,
+    this.accent,
   });
 
   final String event;
   final DateTime? timestamp;
   final double? batteryPercentage;
+  final Color? accent;
 
-  bool get _accent =>
+  bool get _alert =>
       event.contains('disconnect') ||
       event.contains('critical') ||
       event.contains('low');
@@ -26,45 +29,52 @@ class EventTile extends StatelessWidget {
         ? '—'
         : DateFormat('d MMM, HH:mm:ss').format(timestamp!.toLocal());
     final label = event.replaceAll('_', ' ');
+    final lineColor = _alert ? (accent ?? AppColors.primary) : AppColors.stroke;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: _accent ? AppColors.primary : AppColors.border,
-            width: 3,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  when,
-                  style: const TextStyle(
-                    color: AppColors.mutedForeground,
-                    fontSize: 13,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GlassPanel(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 40,
+              decoration: BoxDecoration(
+                color: lineColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label[0].toUpperCase() + label.substring(1),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    when,
+                    style: const TextStyle(
+                      color: AppColors.textDim,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (batteryPercentage != null)
+              Text(
+                '${batteryPercentage!.round()}%',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: accent ?? AppColors.text,
                 ),
-              ],
-            ),
-          ),
-          if (batteryPercentage != null)
-            Text(
-              '${batteryPercentage!.round()}%',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
   }

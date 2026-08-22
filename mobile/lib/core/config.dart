@@ -2,8 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// App configuration / Server URL.
 class AppConfig {
-  static const defaultServerUrl =
-      'https://hostels-rolling-lol-films.trycloudflare.com';
+  static const defaultServerUrl = 'https://astra.lipon.store';
   static const emulatorServerUrl = 'http://10.0.2.2:8765';
   static const _key = 'server_url';
 

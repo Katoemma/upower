@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../theme/app_colors.dart';
+import '../../../theme/astra_shell.dart';
+import '../../../theme/power_atmosphere.dart';
+import '../home/power_controller.dart';
 import 'widgets/event_tile.dart';
 
 class EventsScreen extends ConsumerStatefulWidget {
@@ -49,23 +52,34 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Events')),
+    final power = ref.watch(powerSnapshotProvider);
+    final atmo = PowerAtmosphere.fromPower(
+      acConnected: power.acConnected,
+      percentage: power.percentage,
+    );
+
+    return AstraPageScaffold(
+      atmosphere: atmo,
+      appBar: AstraShell.appBar(context, 'Events'),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: atmo.accent,
+        backgroundColor: AppColors.panel,
         onRefresh: _load,
         child: _loading
             ? ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: CircularProgressIndicator()),
+                children: [
+                  const SizedBox(height: 120),
+                  Center(child: CircularProgressIndicator(color: atmo.accent)),
                 ],
               )
             : _error != null
                 ? ListView(
                     padding: const EdgeInsets.all(24),
                     children: [
-                      Text(_error!, style: const TextStyle(color: AppColors.destructive)),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: AppColors.destructive),
+                      ),
                       const SizedBox(height: 12),
                       TextButton(onPressed: _load, child: const Text('Retry')),
                     ],
@@ -77,13 +91,18 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                           Center(
                             child: Text(
                               'No events yet',
-                              style: TextStyle(color: AppColors.mutedForeground),
+                              style: TextStyle(color: AppColors.textDim),
                             ),
                           ),
                         ],
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          MediaQuery.paddingOf(context).bottom + 24,
+                        ),
                         itemCount: _items.length,
                         itemBuilder: (context, i) {
                           final e = _items[i];
@@ -95,6 +114,7 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                             timestamp: ts,
                             batteryPercentage:
                                 (e['battery_percentage'] as num?)?.toDouble(),
+                            accent: atmo.accent,
                           );
                         },
                       ),

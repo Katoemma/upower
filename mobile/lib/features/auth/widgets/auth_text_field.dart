@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_colors.dart';
+
 class AppTextField extends StatelessWidget {
   const AppTextField({
     super.key,
@@ -29,7 +31,26 @@ class AppTextField extends StatelessWidget {
       textInputAction: textInputAction,
       autofillHints: autofillHints,
       onSubmitted: onSubmitted,
-      decoration: InputDecoration(labelText: label),
+      style: const TextStyle(color: AppColors.text),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textDim),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.batteryHigh, width: 1.5),
+        ),
+      ),
     );
   }
 }
