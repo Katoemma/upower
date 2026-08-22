@@ -67,7 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'UPOWER',
+                    'ASTRA',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.2,
@@ -76,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Native home server · ThinkPad · Ubuntu',
+                    'Homelab monitor · power & system telemetry',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textDim,
                         ),

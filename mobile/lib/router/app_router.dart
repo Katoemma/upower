@@ -83,7 +83,7 @@ class _SplashScreenState extends ConsumerState<_SplashScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Upower',
+              'Astra',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,

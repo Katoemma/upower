@@ -1,6 +1,6 @@
-# Deploy Upower on Ubuntu homelab
+# Deploy Astra on Ubuntu homelab
 
-Move the **power-monitor** daemon from your test machine to a real always-on Ubuntu homelab (ThinkPad, mini PC, etc.). The API stays on `127.0.0.1:8765`; reach it from your phone via **Cloudflare tunnel** (or Tailscale). The Flutter app (**Upower**) connects with JWT login.
+Move the **power-monitor** daemon from your test machine to a real always-on Ubuntu homelab (ThinkPad, mini PC, etc.). The API stays on `127.0.0.1:8765`; reach it from your phone via **Cloudflare tunnel** (or Tailscale). The Flutter app (**Astra**) connects with JWT login.
 
 ---
 
@@ -8,7 +8,7 @@ Move the **power-monitor** daemon from your test machine to a real always-on Ubu
 
 ```
 ┌─────────────────┐     HTTPS/WSS      ┌──────────────────┐
-│  Upower (phone) │ ◄────────────────► │  cloudflared     │
+│  Astra (phone)  │ ◄────────────────► │  cloudflared     │
 └─────────────────┘                    │  (quick or named)│
                                          └────────┬─────────┘
                                                   │ localhost
@@ -177,7 +177,7 @@ SMTP_PORT=587
 SMTP_USER=your-login@smtp-brevo.com
 SMTP_PASSWORD=your-brevo-smtp-key
 SMTP_FROM_ADDRESS=verified-sender@example.com   # must be verified in Brevo → Senders
-SMTP_FROM_NAME=Upower
+SMTP_FROM_NAME=Astra
 SMTP_TO=katoemmy001@gmail.com
 ```
 
@@ -296,11 +296,11 @@ Use a [Cloudflare named tunnel](https://developers.cloudflare.com/cloudflare-one
 
 ---
 
-## 9. Mobile app (Upower)
+## 9. Mobile app (Astra)
 
 On your dev machine (or CI), build/install the APK as you do today. No rebuild required for a new server — only **Settings → Server URL**.
 
-1. Install/open **Upower** on the phone.
+1. Install/open **Astra** on the phone.
 2. **Settings → Server URL** → paste the homelab tunnel URL (no trailing slash).
 3. **Save**, then log in with the homelab user (`katoemmy001@gmail.com` / password from §6).
 4. FCM registers automatically after login (`POST /api/v1/push/tokens`).

@@ -98,7 +98,7 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Upower',
+                  'Astra',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.3,
@@ -106,7 +106,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                 ),
                 Text(
-                  auth.email ?? 'ThinkPad · Ubuntu',
+                  auth.email ?? 'Homelab server',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textDim,
                       ),

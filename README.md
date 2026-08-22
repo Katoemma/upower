@@ -128,10 +128,12 @@ power-monitor user notify-email email@x.com true
 power-monitor user remove email@x.com
 ```
 
-## Mobile testing (cloudflared)
+## Mobile app (Astra)
+
+Flutter client in `mobile/`. See [mobile/README.md](mobile/README.md).
 
 ```bash
 bash packaging/cloudflare-tunnel.sh
 ```
 
-Default Flutter Server URL: `https://hostels-rolling-lol-films.trycloudflare.com` (update in app Settings if the tunnel hostname changes).
+Default server URL in Astra Settings: `https://hostels-rolling-lol-films.trycloudflare.com` (update if the tunnel hostname changes).

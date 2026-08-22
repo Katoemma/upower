@@ -51,7 +51,7 @@ class ServerIdentity extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'NATIVE HOME SERVER',
+                  'ASTRA HOMELAB',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: accent,
                         fontWeight: FontWeight.w800,
@@ -60,7 +60,7 @@ class ServerIdentity extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'ThinkPad · Ubuntu',
+                  'Homelab · Ubuntu',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppColors.text,
                         fontWeight: FontWeight.w700,
@@ -68,7 +68,7 @@ class ServerIdentity extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Company HQ power node — watching watts so you don’t have to.',
+                  'Your homelab node — watching watts and system health.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textDim,
                         height: 1.35,

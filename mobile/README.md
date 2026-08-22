@@ -1,11 +1,11 @@
-# Upower (Flutter)
+# Astra (Flutter)
 
 Mobile client for the Linux `power-monitor` daemon.
 
 ## Defaults
 
 - Server URL: `https://hostels-rolling-lol-films.trycloudflare.com`
-- WebSocket: `wss://hostels-rolling-lol-films.trycloudflare.com/ws?token=…`
+- WebSocket: `wss://hostels-rolling-lol-films.trycloudflare.com/api/v1/stream?token=…`
 - Emulator preset: `http://10.0.2.2:8765` (Settings)
 
 ## Run

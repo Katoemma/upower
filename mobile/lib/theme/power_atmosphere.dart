@@ -69,7 +69,7 @@ class PowerAtmosphere {
         accentSoft: Color(0xFF6EE7B7),
         glow: Color(0xFF10B981),
         label: 'GRID ONLINE',
-        tagline: 'Mains feeding the ThinkPad',
+        tagline: 'Mains feeding the homelab',
         gradient: [Color(0xFF04140F), Color(0xFF05070D), Color(0xFF071A14)],
       );
     }
