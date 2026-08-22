@@ -29,6 +29,9 @@ class EventTile extends StatelessWidget {
         ? '—'
         : DateFormat('d MMM, HH:mm:ss').format(timestamp!.toLocal());
     final label = event.replaceAll('_', ' ');
+    final title = label.isEmpty
+        ? 'Unknown'
+        : label[0].toUpperCase() + label.substring(1);
     final lineColor = _alert ? (accent ?? AppColors.primary) : AppColors.stroke;
 
     return Padding(
@@ -51,7 +54,7 @@ class EventTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label[0].toUpperCase() + label.substring(1),
+                    title,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),

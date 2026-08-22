@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/system_models.dart';
+import '../../../theme/astra_shell.dart';
 import '../../../theme/power_atmosphere.dart';
 import '../auth/auth_controller.dart';
 import '../system/system_controller.dart';
@@ -76,33 +76,9 @@ class HomeScreen extends ConsumerWidget {
         ? 0
         : system.processes.map((p) => p.memoryBytes).reduce((a, b) => a > b ? a : b);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemStatusBarContrastEnforced: false,
-        systemNavigationBarColor: AppColors.voidBlack,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: SizedBox.expand(
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [
-                atmo.glow.withValues(alpha: 0.42),
-                atmo.gradient[0],
-                atmo.gradient.length > 2 ? atmo.gradient[2] : atmo.gradient[1],
-              ],
-              stops: const [0.0, 0.38, 1.0],
-            ),
-          ),
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            body: RefreshIndicator(
+    return AstraPageScaffold(
+      atmosphere: atmo,
+      body: RefreshIndicator(
             color: atmo.accent,
             backgroundColor: AppColors.panel,
             onRefresh: () => _refresh(ref),
@@ -315,9 +291,6 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
           ),
-        ),
-        ),
-      ),
     );
   }
 }

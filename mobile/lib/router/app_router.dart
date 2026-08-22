@@ -7,7 +7,7 @@ import '../features/auth/login_screen.dart';
 import '../features/events/events_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../theme/app_colors.dart';
+import '../theme/astra_shell.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -77,21 +77,21 @@ class _SplashScreenState extends ConsumerState<_SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final atmo = AstraShell.defaultAtmosphere;
+
+    return AstraPageScaffold(
+      atmosphere: atmo,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Astra',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
+            Image.asset(
+              AstraShell.logoAsset,
+              height: 56,
+              fit: BoxFit.contain,
             ),
-            SizedBox(height: 24),
-            CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 28),
+            CircularProgressIndicator(color: atmo.accent),
           ],
         ),
       ),

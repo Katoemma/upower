@@ -4,16 +4,15 @@ Mobile client for the Linux `power-monitor` daemon.
 
 ## Defaults
 
-- Server URL: `https://hostels-rolling-lol-films.trycloudflare.com`
-- WebSocket: `wss://hostels-rolling-lol-films.trycloudflare.com/api/v1/stream?token=…`
+- Server URL: `https://astra.lipon.store`
+- WebSocket: `wss://astra.lipon.store/api/v1/stream?token=…`
 - Emulator preset: `http://10.0.2.2:8765` (Settings)
 
 ## Run
 
 ```bash
-# Host machine: daemon + tunnel
+# Host machine: daemon (+ tunnel or reverse proxy to astra.lipon.store)
 power-monitor daemon
-../packaging/cloudflare-tunnel.sh   # or: cloudflared tunnel --url http://127.0.0.1:8765
 
 # Phone
 flutter run
