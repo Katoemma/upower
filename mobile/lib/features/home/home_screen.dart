@@ -8,7 +8,7 @@ import '../../../theme/power_atmosphere.dart';
 import '../auth/auth_controller.dart';
 import '../system/system_controller.dart';
 import 'power_controller.dart';
-import 'widgets/live_pill.dart';
+import 'widgets/astra_home_header.dart';
 import 'widgets/metric_tile.dart';
 import 'widgets/process_tile.dart';
 import 'widgets/radial_gauge.dart';
@@ -79,54 +79,30 @@ class HomeScreen extends ConsumerWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemStatusBarContrastEnforced: false,
         systemNavigationBarColor: AppColors.voidBlack,
+        systemNavigationBarIconBrightness: Brightness.light,
       ),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: atmo.gradient,
-          ),
-        ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Astra',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        color: AppColors.text,
-                      ),
-                ),
-                Text(
-                  auth.email ?? 'Homelab server',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textDim,
-                      ),
-                ),
+      child: SizedBox.expand(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                atmo.glow.withValues(alpha: 0.42),
+                atmo.gradient[0],
+                atmo.gradient.length > 2 ? atmo.gradient[2] : atmo.gradient[1],
               ],
+              stops: const [0.0, 0.38, 1.0],
             ),
-            actions: [
-              IconButton(
-                tooltip: 'Events',
-                onPressed: () => context.push('/events'),
-                icon: Icon(Icons.history_rounded, color: atmo.accentSoft),
-              ),
-              IconButton(
-                tooltip: 'Settings',
-                onPressed: () => context.push('/settings'),
-                icon: Icon(Icons.tune_rounded, color: atmo.accentSoft),
-              ),
-            ],
           ),
-          body: RefreshIndicator(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: RefreshIndicator(
             color: atmo.accent,
             backgroundColor: AppColors.panel,
             onRefresh: () => _refresh(ref),
@@ -134,13 +110,20 @@ class HomeScreen extends ConsumerWidget {
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 36),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 4,
+                20,
+                36,
+              ),
               children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: LivePill(connected: power.live, atmosphere: atmo),
+                AstraHomeHeader(
+                  displayName: AstraHomeHeader.nameFromEmail(auth.email),
+                  atmosphere: atmo,
+                  live: power.live,
+                  onEvents: () => context.push('/events'),
+                  onSettings: () => context.push('/settings'),
                 ),
-                const SizedBox(height: 4),
                 if (power.loading && system.loading)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 80),
@@ -332,6 +315,7 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );
