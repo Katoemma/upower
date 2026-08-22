@@ -10,15 +10,11 @@ class AstraHomeHeader extends StatelessWidget {
   const AstraHomeHeader({
     super.key,
     required this.displayName,
-    required this.atmosphere,
-    required this.live,
     required this.onEvents,
     required this.onSettings,
   });
 
   final String displayName;
-  final PowerAtmosphere atmosphere;
-  final bool live;
   final VoidCallback onEvents;
   final VoidCallback onSettings;
 
@@ -52,59 +48,43 @@ class AstraHomeHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onSettings,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hi $displayName 👋',
-                        style:
-                            Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.text.withValues(alpha: 0.72),
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 15,
-                                  height: 1.2,
-                                ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hi $displayName 👋',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.text.withValues(alpha: 0.72),
+                        fontWeight: FontWeight.w400,
+                        fontSize: 15,
+                        height: 1.2,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        greeting,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              color: AppColors.text,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 30,
-                              letterSpacing: -0.6,
-                              height: 1.05,
-                            ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  greeting,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: AppColors.text,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 30,
+                        letterSpacing: -0.6,
+                        height: 1.05,
+                      ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 12),
           _GlassIconButton(
-            icon: Icons.search_rounded,
+            icon: Icons.history_rounded,
             tooltip: 'Events',
             onPressed: onEvents,
           ),
           const SizedBox(width: 10),
           _GlassIconButton(
-            icon: Icons.notifications_none_rounded,
-            tooltip: live ? 'Connected · Settings' : 'Settings',
+            icon: Icons.settings_rounded,
+            tooltip: 'Settings',
             onPressed: onSettings,
-            showLiveDot: live,
-            accent: atmosphere.accent,
           ),
         ],
       ),
@@ -117,15 +97,11 @@ class _GlassIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.showLiveDot = false,
-    this.accent,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
-  final bool showLiveDot;
-  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
@@ -150,39 +126,10 @@ class _GlassIconButton extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.14),
                   ),
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 22,
-                      color: AppColors.text.withValues(alpha: 0.92),
-                    ),
-                    if (showLiveDot)
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: accent ?? AppColors.ac,
-                            border: Border.all(
-                              color: AppColors.voidBlack.withValues(alpha: 0.6),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (accent ?? AppColors.ac)
-                                    .withValues(alpha: 0.55),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: AppColors.text.withValues(alpha: 0.92),
                 ),
               ),
             ),

@@ -95,8 +95,6 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 AstraHomeHeader(
                   displayName: AstraHomeHeader.nameFromEmail(auth.email),
-                  atmosphere: atmo,
-                  live: power.live,
                   onEvents: () => context.push('/events'),
                   onSettings: () => context.push('/settings'),
                 ),
